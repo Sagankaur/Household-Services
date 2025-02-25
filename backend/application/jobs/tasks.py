@@ -59,3 +59,29 @@ def send_monthly_reports():
             html=rendered_report
         )
 
+@shared_task(bind = True, ignore_result = False)
+def export_closed_requests(professional_id):
+    service_requests = ServiceRequest.query.filter_by(
+        professional_id=professional_id,
+        service_status='closed'
+    ).all()
+
+    if not service_requests:
+        return None
+
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    file_path = os.path.join('celery', 'User_downloads', f'service_requests_{professional_id}_{timestamp}.csv')
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+    with open(file_path, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['Service ID', 'Customer ID', 'Professional ID', 'Date of Request', 'Review'])
+        for request in service_requests:
+            writer.writerow([request.id, request.customer_id, request.professional_id, request.date_of_request, request.review])
+
+    send_email(
+        subject="CSV Export Completed",
+        recipients=['admin@example.com'],
+        body=f"The CSV export for professional {professional_id} is complete. Download it here: {file_path}"
+    )
+    return file_path
