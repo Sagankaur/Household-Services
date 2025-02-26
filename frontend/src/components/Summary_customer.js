@@ -1,6 +1,6 @@
 import axios from 'axios';
 export default {
-    name: 'CustomerSummary',
+    name: 'SummaryCustomer',
     data() {
       return {
         bar_graph_path_customer: null, // Store the chart image path

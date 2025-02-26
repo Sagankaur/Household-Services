@@ -1,6 +1,6 @@
 import axios from 'axios';
 export default{
-    name:'ProfessionalHome',
+    name:'HomeProfessional',
     props: ['userId'],
     data:{
         showModal: false,

@@ -60,7 +60,7 @@ def send_monthly_reports():
         )
 
 @shared_task(bind = True, ignore_result = False)
-def export_closed_requests(professional_id):
+def export_closed_requests(professional_id): #admin trigerred
     service_requests = ServiceRequest.query.filter_by(
         professional_id=professional_id,
         service_status='closed'

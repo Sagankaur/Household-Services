@@ -1,6 +1,6 @@
 import axios from 'axios';
 export default {
-    name: 'CustomerSearch',
+    name: 'SearchCustomer',
     data() {
       return {
         searchCriteria: {
