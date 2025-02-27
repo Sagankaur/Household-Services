@@ -26,6 +26,80 @@ cache = Cache()
 routes = Blueprint('routes', __name__)
 api=Api(routes)
 
+import jwt
+def verify_auth_token(token):
+    try:
+        data = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
+        user = User.query.get(data['id'])
+        if user and datetime.utcnow() < datetime.fromtimestamp(data['exp']):
+            return user
+    except jwt.ExpiredSignatureError:
+        # Token has expired
+        return None
+    except jwt.InvalidTokenError:
+        # Invalid token
+        return None
+    return None
+
+from functools import wraps
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'message': 'Authorization header is missing'}), 401
+        
+        token = auth_header.split(' ')[1]  # Assuming 'Bearer <token>'
+        user = verify_auth_token(token)
+        
+        if not user:
+            return jsonify({'message': 'Invalid or expired token'}), 401
+        
+        if user.role != 'admin':
+            return jsonify({'message': 'Access denied. Admin role required.'}), 403
+        
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+def professional_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'message': 'Authorization header is missing'}), 401
+        
+        token = auth_header.split(' ')[1]  # Assuming 'Bearer <token>'
+        user = verify_auth_token(token)
+        
+        if not user:
+            return jsonify({'message': 'Invalid or expired token'}), 401
+        
+        if user.role != 'professional':
+            return jsonify({'message': 'Access denied. Professional role required.'}), 403
+        
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+def customer_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({'message': 'Authorization header is missing'}), 401
+        
+        token = auth_header.split(' ')[1]  # Assuming 'Bearer <token>'
+        user = verify_auth_token(token)
+        
+        if not user:
+            return jsonify({'message': 'Invalid or expired token'}), 401
+        
+        if user.role != 'customer':
+            return jsonify({'message': 'Access denied. Customer role required.'}), 403
+        
+        return f(*args, **kwargs)
+    return decorated_function
 # from main import db
 
 # user_fields = {
@@ -66,7 +140,7 @@ class Admin(Resource):
         return {"message": "Welcome, Admin!"}
         
     #@routes.route('/home_admin/<int:user_id>') #auth tocken required
-    def home_admin(self,user_id):
+    def home_admin(self,user_id=None):
         if 'user_id' not in session or session.get('role') != 'admin':
             return redirect(url_for('routes.login'))
         
@@ -84,7 +158,7 @@ class Admin(Resource):
             'pending_requests':pending_requests}
         )
     #C Service
-    @routes.route('/add_service', methods=['POST']) #done ny admin only
+    # @routes.route('/add_service', methods=['POST']) #done ny admin only
     @auth_required('token')
     def add_service():
         name = request.form['name']
@@ -98,7 +172,7 @@ class Admin(Resource):
         
         return redirect(url_for('routes.home_admin'))
 
-    @routes.route('/get_services', methods=['GET'])
+    # @routes.route('/get_services', methods=['GET'])
     def get_services():
         try:
             # Query the services from your database (make sure to adjust for your actual model and data)
@@ -117,7 +191,7 @@ class Admin(Resource):
             # Handle any errors and return an appropriate response
             return jsonify({"error": str(e)}), 500
 
-    @routes.route('/update_service/<int:service_id>', methods=['PUT'])
+    # @routes.route('/update_service/<int:service_id>', methods=['PUT'])
     def update_service(service_id):
         data = request.json
         service = Service.query.get(service_id)
@@ -131,7 +205,7 @@ class Admin(Resource):
         return jsonify({'error': 'Service not found'}), 404
 
     # admin can do Professional
-    @routes.route('/action_professional/<int:id>/<action>', methods=['POST'])
+    # @routes.route('/action_professional/<int:id>/<action>', methods=['POST'])
     def action_professional(id):
         professional = Professional.query.get(id)
         if professional:
@@ -146,7 +220,7 @@ class Admin(Resource):
         db.session.commit()
         return jsonify({'success': True})
 
-    @routes.route('/view_request/<int:id>', methods=['GET']) #VIEW Service Request
+    # @routes.route('/view_request/<int:id>', methods=['GET']) #VIEW Service Request
     def view_request(id):
         service_request = ServiceRequest.query.get(id)
         if not service_request:
@@ -181,8 +255,8 @@ class Admin(Resource):
 
     from sqlalchemy import or_
 
-    @routes.route('/search_admin/<int:user_id>', methods=['GET'])
-    def search_admin():
+    # @routes.route('/search_admin/<int:user_id>', methods=['GET'])
+    def search_admin(self):
         search_type = request.args.get('search_type')
         query = request.args.get('query')
 
@@ -259,9 +333,9 @@ class Admin(Resource):
             return jsonify({'message': 'Service request deleted successfully'})
         return jsonify({'error': 'Service request not found'}), 404
 
-    @routes.route('/summary_admin/<int:user_id>')
+    # @routes.route('/summary_admin/<int:user_id>')
     @cache.cached(key_prefix=lambda: f'summary_admin', timeout=3000)
-    def summary_admin(user_id):
+    def summary_admin(self,user_id):
         if 'user_id' not in session or session.get('role') != 'admin':
             return redirect(url_for('routes.login'))
 
@@ -333,8 +407,9 @@ class Professional(Resource):
         return {"message": "Welcome, Professional!"}
     
     
-    @routes.route('/home_professional/<int:user_id>')
-    def home_professional(user_id):
+    # @routes.route('/home_professional/<int:user_id>')
+    @professional_required
+    def home_professional(self,user_id=None):
         professional_id=user_id
         if 'user_id' not in session or session.get('role') != 'professional':
             return redirect(url_for('routes.login'))
@@ -400,7 +475,7 @@ class Professional(Resource):
         )
 
     # Route to handle Accept/Reject actions for service requests
-    @routes.route('/service_request_action/<int:request_id>/<action>', methods=['POST'])
+    # @routes.route('/service_request_action/<int:request_id>/<action>', methods=['POST'])
     def service_request_action(request_id, action):
         if 'user_id' not in session or session.get('role') != 'professional':
             return redirect(url_for('routes.login'))
@@ -445,8 +520,8 @@ class Professional(Resource):
 
         return jsonify({ 'professional':professional})
 
-    @routes.route('/search_professional/<int:user_id>', methods=['GET'])
-    def search_professional(user_id):
+    # @routes.route('/search_professional/<int:user_id>', methods=['GET'])
+    def search_professional(self,user_id):
         search_type = request.args.get('search_type')
         query = request.args.get('query')
 
@@ -492,9 +567,9 @@ class Professional(Resource):
 
         return jsonify({"requests": results})
 
-    @routes.route('/summary_professional/<int:user_id>')
+    # @routes.route('/summary_professional/<int:user_id>')
     @cache.cached(key_prefix=lambda: f'summary_professional_{user_id}', timeout=500)
-    def summary_professional(user_id):
+    def summary_professional(self,user_id):
         professional = Professional.query.get(user_id)    
         if professional:
             # Get ratings data
@@ -565,14 +640,15 @@ class Professional(Resource):
         return graph_bar_path_prof
 
 class Customer(Resource):
-    @auth_required('token')
+    # @auth_required('token')
+    @customer_required
     def get(self):
         return {"message": "Welcome, Customer!"}
     
-    @routes.route('/home_customer/<int:user_id>', methods=['GET', 'POST'])
-    def home_customer(self, user_id): #get
+    @customer_required
+    def home_customer(self, user_id=None): #get
         if request.method == 'POST':
-            # Update customer profile logic
+        # Update customer profile logic
             data = request.json
             user = User.query.get_or_404(user_id)
             user.name = data.get("name", user.name)
@@ -627,7 +703,6 @@ class Customer(Resource):
 
         return jsonify(response), 200
 
-    @routes.route('/close_request/<int:request_id>', methods=['GET', 'POST'])
     def close_request(request_id):
         # Get the service request by ID
         service_request = ServiceRequest.query.get_or_404(request_id)
@@ -661,8 +736,7 @@ class Customer(Resource):
 
         return jsonify({"message": "Service request closed and review submitted successfully."}), 200
 
-    @routes.route('/search_customer', methods=['POST','GET']) #search for service but show prof
-    def search_customer():
+    def search_customer(self):
         data = request.json
         service_name = data.get('service_name')
         pincode = data.get('pincode')
@@ -718,9 +792,9 @@ class Customer(Resource):
 
         return jsonify({"message": "Service successfully booked!"})
 
-    @routes.route('/summary_customer/<int:user_id>')
+    # @routes.route('/summary_customer/<int:user_id>')
     @cache.cached(key_prefix=lambda: f'summary_customer_{user_id}', timeout=3000)
-    def summary_customer(user_id):
+    def summary_customer(self,user_id):
         customer_id = session.get('user_id')
         
         # Fetch the service requests grouped by status
@@ -760,31 +834,31 @@ class Customer(Resource):
 
         return chart_file_path
 
-api.add_resource(Admin, '/admin')
-api.add_resource(Admin, '/home_admin/<int:user_id>')
-api.add_resource(Admin, '/add_service')
-api.add_resource(Admin, '/get_services')
-api.add_resource(Admin, '/update_service/<int:service_id>')
-api.add_resource(Admin, '/action_professional/<int:id>/<action>')
-api.add_resource(Admin, '/view_request/<int:id>')
-api.add_resource(Admin, '/delete_request/<int:request_id>')
-api.add_resource(Admin, '/search_admin/<int:user_id>')
-api.add_resource(Admin, '/view_professional/<int:id>')
-api.add_resource(Admin, '/view_customer/<int:id>')
-api.add_resource(Admin, '/view_service/<int:id>')
-api.add_resource(Admin, '/summary_admin/<int:user_id>')
-api.add_resource(Admin, '/export_csv/<int:professional_id>')
+# api.add_resource(Admin, '/admin')
+# api.add_resource(Admin, '/home_admin/<int:user_id>')
+# api.add_resource(Admin, '/add_service')
+# api.add_resource(Admin, '/get_services')
+# api.add_resource(Admin, '/update_service/<int:service_id>')
+# api.add_resource(Admin, '/action_professional/<int:id>/<action>')
+# api.add_resource(Admin, '/view_request/<int:id>')
+# api.add_resource(Admin, '/delete_request/<int:request_id>')
+# api.add_resource(Admin, '/search_admin/<int:user_id>')
+# api.add_resource(Admin, '/view_professional/<int:id>')
+# api.add_resource(Admin, '/view_customer/<int:id>')
+# api.add_resource(Admin, '/view_service/<int:id>')
+# api.add_resource(Admin, '/summary_admin/<int:user_id>')
+# api.add_resource(Admin, '/export_csv/<int:professional_id>')
 
-api.add_resource(Professional, '/professional')
-api.add_resource(Professional, '/home_professional/<int:user_id>')
-api.add_resource(Professional, '/service_request_action/<int:request_id>/<action>')
-api.add_resource(Professional, '/edit_profile_prof')
-api.add_resource(Professional, '/search_professional/<int:user_id>')
-api.add_resource(Professional, '/summary_professional/<int:user_id>')
+# api.add_resource(Professional, '/professional')
+# api.add_resource(Professional, '/home_professional/<int:user_id>')
+# api.add_resource(Professional, '/service_request_action/<int:request_id>/<action>')
+# api.add_resource(Professional, '/edit_profile_prof')
+# api.add_resource(Professional, '/search_professional/<int:user_id>')
+# api.add_resource(Professional, '/summary_professional/<int:user_id>')
 
-api.add_resource(Customer, '/customer')
-api.add_resource(Customer, '/home_customer/<int:user_id>')
-api.add_resource(Customer, '/close_request/<int:request_id>')
-api.add_resource(Customer, '/search_customer')
-api.add_resource(Customer, '/book_service')
-api.add_resource(Customer, '/summary_customer/<int:user_id>')
+# api.add_resource(Customer, '/customer')
+# api.add_resource(Customer, '/home_customer/<int:user_id>')
+# api.add_resource(Customer, '/close_request/<int:request_id>')
+# api.add_resource(Customer, '/search_customer')
+# api.add_resource(Customer, '/book_service')
+# api.add_resource(Customer, '/summary_customer/<int:user_id>')

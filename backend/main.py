@@ -60,10 +60,39 @@ from application.controllers.controllers import *
 app.register_blueprint(routes)
 
 from application.controllers.api import *
-#api.add_resource(SectionAPI, '/api/section', '/api/section/<int:id>')
-#api.add_resource(BookAPI, '/api/sectbook/<id>', '/api/book/<int:s_id>')
+api.add_resource(Admin, '/admin')
+api.add_resource(Admin, '/home_admin/<int:user_id>')
+api.add_resource(Admin, '/add_service')
+api.add_resource(Admin, '/get_services')
+api.add_resource(Admin, '/update_service/<int:service_id>')
+api.add_resource(Admin, '/action_professional/<int:id>/<action>')
+api.add_resource(Admin, '/view_request/<int:id>')
+api.add_resource(Admin, '/delete_request/<int:request_id>')
+api.add_resource(Admin, '/search_admin/<int:user_id>')
+api.add_resource(Admin, '/view_professional/<int:id>')
+api.add_resource(Admin, '/view_customer/<int:id>')
+api.add_resource(Admin, '/view_service/<int:id>')
+api.add_resource(Admin, '/summary_admin/<int:user_id>')
+api.add_resource(Admin, '/export_csv/<int:professional_id>')
 
+api.add_resource(Professional, '/professional')
+api.add_resource(Professional, '/home_professional/<int:user_id>')
+api.add_resource(Professional, '/service_request_action/<int:request_id>/<action>')
+api.add_resource(Professional, '/edit_profile_prof')
+api.add_resource(Professional, '/search_professional/<int:user_id>')
+api.add_resource(Professional, '/summary_professional/<int:user_id>')
+
+api.add_resource(Customer, '/customer')
+api.add_resource(Customer, '/home_customer/<int:user_id>')
+api.add_resource(Customer, '/close_request/<int:request_id>')
+api.add_resource(Customer, '/search_customer')
+api.add_resource(Customer, '/book_service')
+api.add_resource(Customer, '/summary_customer/<int:user_id>')
 
 if __name__ == "__main__":
     create_data()
+    # user = User.query.filter_by(username="cust").first()
+    # print(user.password)  # Verify stored hash
+    # print(check_password_hash(user.password, "pass"))  # Should be True if correct
+
     app.run(debug=True)

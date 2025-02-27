@@ -1,9 +1,11 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_security import SQLAlchemyUserDatastore
 from flask_security import UserMixin, RoleMixin, Security
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import event
 from sqlalchemy import Column, Float
+import jwt
+from flask import current_app
 
 db = SQLAlchemy()
 
@@ -50,28 +52,55 @@ class User(db.Model, UserMixin):
             'roles' : [roles.name for roles in self.roles]
         }
 
-    def set_role(self, role_name):
+    def set_role(self, role_name, **kwargs):
         role = Role.query.filter_by(name=role_name).first()
-        if role:
-            self.roles = [role]  # Replace existing roles with the new role
-            # db.session.commit() # Commit the changes to db  <- REMOVE this line, committing too early
-
-        else:
+        if not role:
             raise ValueError(f"Role '{role_name}' not found.")
+
+        self.roles = [role]  # Replace existing roles with the new role
 
         if role_name == "Customer" and not self.customer:
             self.customer = Customer(id=self.id)
-            db.session.add(self.customer)  # Add the new Customer object to the session
+            db.session.add(self.customer)
         elif role_name == "Professional" and not self.professional:
-            default_service = Service.query.first()
-            if default_service:
-                self.professional = Professional(id=self.id, service_id=default_service.id)
-                db.session.add(self.professional) #add the new Professional object to the session
-            else: 
-                raise ValueError("No service available")
+            # Default values
+            professional_data = {
+                'id': self.id,
+                'service_id': None,
+                'experience': None,
+                'status': 'pending',
+                'ratings': None,
+                'review': None,
+                'total_reviews': 0
+            }
 
-        db.session.add(self) #add the user object
-        db.session.commit()  # Commit all changes (user and customer) at once
+            # Update with provided values
+            professional_data.update(kwargs)
+
+            # Validate service_id
+            if professional_data['service_id'] is None:
+                default_service = Service.query.first()
+                if not default_service:
+                    raise ValueError("No service available")
+                professional_data['service_id'] = default_service.id
+            else:
+                service = Service.query.get(professional_data['service_id'])
+                if not service:
+                    raise ValueError(f"Service with id {professional_data['service_id']} not found.")
+
+            # Create and add Professional instance
+            self.professional = Professional(**professional_data)
+            db.session.add(self.professional)
+
+        db.session.add(self)
+        db.session.commit()
+
+    def generate_auth_token(self, expires_in=3600):
+        return jwt.encode(
+            {'id': self.id, 'exp': datetime.utcnow() + timedelta(seconds=expires_in)},
+            current_app.config['SECRET_KEY'],
+            algorithm='HS256'
+        )
 
 class Role(db.Model, RoleMixin):
     __tablename__ = 'role'

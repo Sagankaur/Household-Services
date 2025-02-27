@@ -10,6 +10,7 @@ from flask_cors import cross_origin, CORS
 import os
 import io
 from io import BytesIO
+import jwt
 
 import matplotlib.pyplot as plt
 from sqlalchemy import func
@@ -25,48 +26,48 @@ from flask import Blueprint, current_app
 
 routes = Blueprint('routes', __name__)
 
-@routes.route('/login',methods=['GET','POST'])
-def commonlogin(): 
+@routes.route('/login', methods=['GET', 'POST'])
+def commonlogin():
+    print("Login request received")
     if request.method == 'GET':
         return jsonify({"message": "This is a login API. Please send a POST request with JSON data."}), 400
 
-    print(f"Content-Type: {request.content_type}")
-    print(f"Data: {request.data}")  # Log raw request data
-    print(f"JSON: {request.get_json()}")
     try:
-        # Parse the incoming JSON data
         data = request.get_json()
-
         if not data:
             return jsonify({"error": "No data provided"}), 400
 
         username = data.get('username')
         password = data.get('password')
 
+        if not username or not password:
+            return jsonify({"error": "Missing username or password"}), 400
+
+        # Query the database for the user
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
         
+        # Debugging prints
+        print(f"Check password result: {check_password_hash(user.password, password)}")
+
         if user.roles:
             role = user.roles[0].name  # Assuming a user has only one role
         else:
             role = "No Role Assigned"
 
-        if not username or not password:
-            return jsonify({"error": "Missing username or password"}), 400
-
         if role == 'Admin':
-            return jsonify({"error": "Access Denied. Admins can Not log in here."}), 403
+            return jsonify({"error": "Access Denied. Admins cannot log in here."}), 403
 
-        # Query the database for the user
-        user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
-            # Generate a token or set session if needed
-            token = user.get_auth_token()  # Assume this method exists on your user model
-            role = user.roles[0].name
-            return jsonify({'token': token, 'user_id': user.id, 'role': role}), 200
-
-        return jsonify({"error": "Invalid credentials"}), 401
+        if check_password_hash(user.password, password):
+            token = user.generate_auth_token()   # Assume this method exists on your user model
+            return jsonify({'token': token, 'userId': user.id, 'role': role}), 200
+        else:
+            return jsonify({"error": "Invalid credentials"}), 401
 
     except Exception as e:
-         return jsonify({"error": str(e)}), 500
+        print(f"Login error: {str(e)}")  # Log the error
+        return jsonify({"error": "An unexpected error occurred"}), 500
 
 @routes.route('/register', methods=['GET','POST'])
 def commonregister():
@@ -116,46 +117,6 @@ def commonregister():
     else:
         return jsonify({"success": False, "message": "Invalid request method."}), 405
 
-@routes.route('/adminlogin', methods=['POST'])
-def admin_login():
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"error": "No data provided"}), 400
-
-        username = data.get('username', '').strip()
-        password = data.get('password', '').strip()
-
-        if not username or not password:
-            return jsonify({"error": "Missing username or password"}), 400
-
-        user = User.query.filter_by(username=username).first()
-
-        if not user:
-            return jsonify({"error": "Invalid user"}), 401
-
-        if not check_password_hash(user.password, password):
-            return jsonify({"error": "Invalid credentials"}), 401
-
-        if user.roles:
-            role = user.roles[0].name  # Assuming a user has only one role
-        else:
-            role = "No Role Assigned"
-
-        if role != 'Admin':
-            return jsonify({"error": "Access Denied. Only admins can log in."}), 403
-
-        token = create_access_token(identity=user.id)
-
-        return jsonify({
-            'token': token,
-            'userId': user.id,
-            'role': role
-        }), 200
-    
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
 @routes.route('/logout')
 def logout():
     session.clear()
@@ -179,3 +140,46 @@ def get_services():
     except Exception as e:
         # Handle any errors and return an appropriate response
         return jsonify({"error": str(e)}), 500
+
+@routes.route('/adminlogin', methods=['GET', 'POST'])
+def adminlogin():
+    print("Admin Login request received")
+    if request.method == 'GET':
+        return jsonify({"message": "This is a login API. Please send a POST request with JSON data."}), 400
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        username = data.get('username')
+        password = data.get('password')
+
+        if not username or not password:
+            return jsonify({"error": "Missing username or password"}), 400
+
+        # Query the database for the user
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Debugging prints
+        print(f"Check password result: {check_password_hash(user.password, password)}")
+
+        if user.roles:
+            role = user.roles[0].name  # Assuming a user has only one role
+        else:
+            role = "No Role Assigned"
+
+        if role != 'Admin':
+            return jsonify({"error": "Access Denied. Only Admins can log in here."}), 403
+
+        if check_password_hash(user.password, password):
+            token = user.generate_auth_token()   # Assume this method exists on your user model
+            return jsonify({'token': token, 'userId': user.id, 'role': role}), 200
+        else:
+            return jsonify({"error": "Invalid credentials"}), 401
+
+    except Exception as e:
+        print(f"Login error: {str(e)}")  # Log the error
+        return jsonify({"error": "An unexpected error occurred"}), 500

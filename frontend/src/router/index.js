@@ -13,7 +13,7 @@ const routes = [
 
   // Admin Routes
   { path: '/home_admin/:user_id', component: components.HomeAdmin, meta: { requiresAuth: true, role: 'Admin' } },
-  { path: '/search_admin/:user_id', component: components.SearchAdmin, meta: { requiresAuth: true, role: 'Admin' } },
+  { path: '/search_admin', component: components.SearchAdmin, meta: { requiresAuth: true, role: 'Admin' } },
   { path: '/summary_admin/:user_id', component: components.SummaryAdmin, meta: { requiresAuth: true, role: 'Admin' } },
 
   // Professional Routes
@@ -23,7 +23,7 @@ const routes = [
 
   // Customer Routes
   { path: '/home_customer/:user_id', component: components.HomeCustomer, meta: { requiresAuth: true, role: 'Customer' } },
-  { path: '/search_customer/:user_id', component: components.SearchCustomer, meta: { requiresAuth: true, role: 'Customer' } },
+  { path: '/search_customer', component: components.SearchCustomer, meta: { requiresAuth: true, role: 'Customer' } },
   { path: '/summary_customer/:user_id', component: components.SummaryCustomer, meta: { requiresAuth: true, role: 'Customer' } },
 
   // Catch-all route for 404
@@ -38,16 +38,18 @@ const router = createRouter({
 
 // Navigation Guards
 router.beforeEach((to, from, next) => {
-  const loggedIn = store.state.loggedIn;
-  const userRole = store.state.role;
+  // const isLoggedIn = store.getters.isLoggedIn
+  const isAuth = store.getters.isAuth
+  const userRole = store.getters.userRole
 
-  if (to.meta.requiresAuth && !loggedIn) {
+  if (to.meta.requiresAuth && !isAuth) {
     next('/login');
-  } else if (to.meta.role && to.meta.role !== userRole) {
-    next('/login');
+  } else if (to.meta.requiresAuth && to.meta.role !== userRole) {
+    next('/') // Redirect to home or unauthorized page
+  } else if (isAuth && (to.path === '/login' || to.path === '/register' || to.path === '/adminlogin')) {
+    next(`/home_${userRole.toLowerCase()}/${store.getters.userId}`)
   } else {
-    next();
+    next()
   }
-});
-
+})
 export default router;

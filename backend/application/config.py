@@ -14,6 +14,9 @@ class Config():
     CACHE_REDIS_PORT=6379
     TIMEZONE="Asia/Kolkata"
 
+    SECRET_KEY ='your-secret-key-here'
+    SECURITY_URL_PREFIX = '/security'
+
 class LocalDevelopmentConfig(Config):
     SQLITE_DB_DIR = os.path.join(basedir, "../databases")
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + os.path.join(SQLITE_DB_DIR, "database.sqlite3")
