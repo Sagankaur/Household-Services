@@ -132,7 +132,7 @@ export default {
         ];
       } else if (this.userRole === "Professional" && this.userId) {
         return [
-          { name: "Professional Home", path: `/professional_home/${this.userId}` },
+          { name: "Professional Home", path: `/home_professional/${this.userId}` },
           { name: "Search", path: `/search_professional/${this.userId}` },
           { name: "Summary", path: `/summary_professional/${this.userId}` },
           { name: "Logout", path: "/login" },

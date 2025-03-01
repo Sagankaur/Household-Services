@@ -220,7 +220,7 @@ class Admin(Resource):
         db.session.commit()
         return jsonify({'success': True})
 
-    # @routes.route('/view_request/<int:id>', methods=['GET']) #VIEW Service Request
+    # @routes.route('/view_request/<int:id>', methods=['GET']) #VIEW Service Request All can check this
     def view_request(id):
         service_request = ServiceRequest.query.get(id)
         if not service_request:
@@ -402,7 +402,7 @@ class Admin(Resource):
         return jsonify({'message': 'CSV export job started'}), 200
 
 class Professional(Resource):
-    @auth_required('token')
+    @professional_required
     def get(self):
         return {"message": "Welcome, Professional!"}
     
@@ -676,10 +676,10 @@ class Customer(Resource):
                 'professional_username': request.professional.user.username,
                 'professional_name': request.professional.user.name,
                 'p_phone': request.professional.user.phone_number,
-                'service': request.service.name,
-                'date_of_request': request.date_of_request.strftime('%Y-%m-%d'),
+                'service_type': request.service.name, 
+                'request_date': request.date_of_request.strftime('%Y-%m-%d'),
                 'remarks': request.remarks,
-                "service_status": request.service_status,
+                "status": request.service_status,
                 'date_of_completion': request.date_of_completion.strftime('%Y-%m-%d') if request.date_of_completion else None,
                 'review': request.review,
                 'ratings': request.ratings
@@ -725,13 +725,16 @@ class Customer(Resource):
 
         # Update professional's average rating
         professional = Professional.query.get(service_request.professional_id)
+        if not professional:
+            return jsonify({"message": "Service request closed and review submitted successfully, but professional not found."}), 200
+    
         if professional:
             total_reviews = professional.total_reviews + 1
             professional.ratings = ((professional.ratings * professional.total_reviews) + ratings) / total_reviews
             professional.total_reviews = total_reviews
 
         db.session.commit()
-        cache.delete(f'summary_professional_{professional_id}')
+        cache.delete(f'summary_professional_{service_request.professional_id}')
         cache.delete(f'summary_admin')
 
         return jsonify({"message": "Service request closed and review submitted successfully."}), 200

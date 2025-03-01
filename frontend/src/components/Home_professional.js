@@ -294,12 +294,16 @@
 //     `}
 
 import axios from 'axios';
-import { mapState } from 'vuex';
+// import { mapState } from 'vuex';
 
 export default {
     name: 'HomeProfessional',
-    computed: {
-        ...mapState(['userId', 'token']),
+    // computed: {
+    //     ...mapState(['userId', 'token']),
+    // },
+    mounted() {
+        const userId = this.$route.params.userId;
+        this.fetchData(userId);
     },
     data() {
         return {
@@ -324,15 +328,13 @@ export default {
             isEditing: false
         };
     },
-    mounted() {
-        this.fetchData();
-    },
     methods: {
-        async fetchData() {
+        async fetchData(userId) {
             try {
-                const response = await axios.get(`/home_professional/${this.userId}`, {
+                const token = this.$store.getters.authToken; // Use Vuex state
+                const response = await axios.get(`http://localhost:5000/home_professional/${userId}`, {
                     headers: {
-                        Authorization: `Bearer ${this.token}`
+                        Authorization: `Bearer ${token}`
                     }
                 });
                 const data = response.data;
@@ -345,15 +347,15 @@ export default {
                 console.error("Error fetching data:", error);
             }
         },
-        async updateProfile() {
+        async updateProfile(userId) {
             try {
-                const response = await axios.post(`/home_professional/${this.userId}`, {
+                const response = await axios.post(`/home_professional/${userId}`, {
                     ...this.user,
                     ...this.professional,
                 }, {
                     headers: {
                         'Content-Type': 'application/json',
-                        Authorization: `Bearer ${this.token}`
+                        Authorization: `Bearer ${this.$store.getters.authToken}`
                     }
                 });
                 alert(response.data.message);
@@ -372,7 +374,7 @@ export default {
             try {
                 const response = await axios.get(`/view_request/${id}`, {
                     headers: {
-                        Authorization: `Bearer ${this.token}`
+                        Authorization: `Bearer ${this.$store.getters.authToken}`
                     }
                 });
                 this.selectedRequest = response.data;
@@ -385,7 +387,7 @@ export default {
             try {
                 await axios.post(`/service_request_action/${id}/accept`, {}, {
                     headers: {
-                        Authorization: `Bearer ${this.token}`
+                        Authorization: `Bearer ${this.$store.getters.authToken}`
                     }
                 });
                 alert('Request accepted successfully.');
@@ -399,7 +401,7 @@ export default {
             try {
                 await axios.post(`/service_request_action/${id}/reject`, {}, {
                     headers: {
-                        Authorization: `Bearer ${this.token}`
+                        Authorization: `Bearer ${this.$store.getters.authToken}`
                     }
                 });
                 alert('Request rejected successfully.');
@@ -527,8 +529,7 @@ template:`
                     </tr>
                 </thead>
                 <tbody>
-                    {% for request in AcceptedRequests %}
-                    <tr>
+                    <tr v-for="request in AcceptedRequests" :key="request.id">
                         <td>{{ request.id }}</td>
                         <td>{{ request.customer.name }}</td>
                         <td>{{ request.date_of_request.strftime('%Y-%m-%d') }}</td>
@@ -536,7 +537,7 @@ template:`
                         <td>
                             <button class="btn btn-info btn-sm" @click="viewRequest(request.id)">View</button>
                         </td>
-                    {% endfor %}
+                    </tr>
                 </tbody>
             </table>
         </div>
@@ -557,8 +558,7 @@ template:`
                 </tr>
             </thead>
             <tbody>
-                {% for request in PendingRequests %}
-                <tr>
+                <tr v-for="request in PendingRequests" :key="request.id">
                     <td>{{ request.id }}</td>
                     <td>{{ request.customer.name }}</td>
                     <td>{{ request.date_of_request.strftime('%Y-%m-%d') }}</td>
@@ -572,7 +572,7 @@ template:`
                     </td>
                     
                 </tr>
-                {% endfor %}
+                
             </tbody>
         </table>
     </div>
@@ -593,8 +593,7 @@ template:`
                 </tr>
             </thead>
             <tbody>
-                {% for request in CompletedRequests %}
-                <tr>
+                <tr v-for="request in CompletedRequests" :key="request.id">
                     <td>{{ request.id }}</td>
                     <td>{{ request.customer.name }}</td>
                     <td>{{ request.date_of_request.strftime('%Y-%m-%d') }}</td>

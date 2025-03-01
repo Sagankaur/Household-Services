@@ -1,28 +1,42 @@
+import axios from 'axios';
+
 export default {
     name: 'SearchProfessional',
-    data: {
-        showRequestModal: false,
-        selectedRequest: {},
-        Requests: [],
-        userId : null
+    data() {
+        return {
+            showRequestModal: false,
+            selectedRequest: {},
+            Requests: [],
+            userId: null,
+            search: {
+                date: '',
+                address: '',
+                pincode: ''
+            },
+            serviceRequests: []
+        }
     },
     mounted() {
-	this.userId = this.$route.params.userId;
-        // const role = this.$route.params.role;
+        this.userId = this.$route.params.userId;
         this.fetchData();
     },
-
-    methods:{
+    methods: {
         async fetchData() {
-            await Promise.all([
-                this.fetchRequests(),
-            ]);
+            await this.fetchRequests(this.userId);
         },
-        async fetchRequests() {
-            const response = await fetch(`/search_professional/${this.userId}`);
-            const data = await response.json();
-            this.Requests = data.requests;
-        },
+        async fetchRequests(userId) {
+            try {
+                const token = this.$store.getters.authToken; // Use Vuex state
+                const response = await axios.get(`http://localhost:5000/search_professional/${userId}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
+                this.Requests = response.data.requests;
+            } catch (error) {
+                console.error("Error fetching data:", error);
+            }
+        },    
         async viewRequest(id) {
             const response = await fetch(`/view_request/${id}`);
             const data = await response.json();
@@ -31,6 +45,10 @@ export default {
         },
         closeModal() {
             this.showRequestModal = false;
+        },
+        async searchRequests() {  
+            // Implement your search logic here
+            this.serviceRequests = this.Requests;
         }
     },
     template:

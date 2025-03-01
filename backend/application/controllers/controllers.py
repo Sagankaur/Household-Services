@@ -21,7 +21,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 #from app import cache
 from application.data.model import *
+from application.data.create_initial_data import hash_password
 from flask import Blueprint, current_app
+
 # from application.database import db
 
 routes = Blueprint('routes', __name__)
@@ -82,8 +84,8 @@ def commonregister():
         pincode = data.get('pincode')
         role_name = data.get('role')
 
-        def hash_password(password):
-            return generate_password_hash(password, method="pbkdf2:sha256", salt_length=8)
+        # def hash_password(password):
+        #     return generate_password_hash(password, method="pbkdf2:sha256", salt_length=8)
 
         # Hash the password using Flask-Security
         hashed_password = hash_password(password)
@@ -116,6 +118,65 @@ def commonregister():
         return jsonify({"success": True, "message": "Registration successful."}), 201
     else:
         return jsonify({"success": False, "message": "Invalid request method."}), 405
+
+# @routes.route('/register', methods=['GET','POST'])
+# def commonregister():
+#     if request.method == 'POST':
+#         data = request.json
+#         name = data.get('name')
+#         username = data.get('username')
+#         password = data.get('password')
+#         email = data.get('email')
+#         phone_number = data.get('phone_number')
+#         address = data.get('address')
+#         pincode = data.get('pincode')
+#         role_name = data.get('role')
+
+#         # Check if the username or email already exists
+#         if User.query.filter_by(username=username).first():
+#             return jsonify({"success": False, "message": "User with this username already exists."}), 400
+
+#         # Find or create the role
+#         role = datastore.find_or_create_role(name=role_name, description=f"{role_name} role")
+        
+#         if not role:
+#             return jsonify({"success": False, "message": f"Unable to create or find role: {role_name}"}), 400
+
+#         # Create the user
+#         user = datastore.create_user(
+#             name=name, 
+#             username=username, 
+#             email=email, 
+#             password=password,  
+#             phone_number=phone_number, 
+#             address=address, 
+#             pincode=pincode
+#         )
+
+#         # Add the role to the user
+#         datastore.add_role_to_user(user, role)
+
+#         db.session.flush()  # Get user ID before committing
+        
+#         # Add role-specific data
+#         if role_name == 'Professional':
+#             service_type = data.get('service_type')
+#             experience = data.get('experience')
+#             service = Service.query.filter_by(name=service_type).first()
+#             if not service:
+#                 return jsonify({"success": False, "message": f"Service type not found: {service_type}"}), 400
+#             professional = Professional(id=user.id, service_id=service.id, experience=experience)
+#             db.session.add(professional)
+#         elif role_name == 'Customer':
+#             customer = Customer(id=user.id)
+#             db.session.add(customer)
+
+#         db.session.commit()
+
+#         return jsonify({"success": True, "message": "Registration successful."}), 201
+#     else:
+#         return jsonify({"success": False, "message": "Invalid request method."}), 405
+
 
 @routes.route('/logout')
 def logout():

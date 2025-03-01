@@ -14,7 +14,9 @@ export default {
         address: '',
         pincode: ''
       },
-      services: [] // Array to hold the available services
+      services: [], // Array to hold the available services,
+      successMessage: '',
+      errorMessage: '' 
     };
   },
   methods: {
@@ -29,7 +31,32 @@ export default {
           console.error('Error fetching services:', error);
         });
     },
-
+    submitForm() {
+      axios
+        .post('http://localhost:5000/register', this.formData)
+        .then(response => {
+          console.log('Full response:', response);
+          const data = response.data;
+          
+          if (data.success) {
+            // Display success message
+            this.successMessage = `Registration successful! You can now login as ${this.formData.username}.`;
+            
+            // Optionally, you can set a timeout to redirect to login page after showing the message
+            setTimeout(() => {
+              this.$router.push("/login");
+            }, 15000); // Redirect after 15 seconds
+          } else {
+            console.error('Registration failed:', data.message);
+            this.errorMessage = data.message || "Registration failed. Please try again.";
+          }
+        })
+        .catch(error => {
+          console.error('Error during registration', error);
+          this.errorMessage = "An error occurred during registration. Please try again.";
+        });
+    },
+    
     // Method to toggle the visibility of professional fields based on role selection
     toggleProfessionalFields() {
       if (this.formData.role !== 'professional') {
@@ -37,20 +64,6 @@ export default {
         this.formData.experience = '';
       }
     },
-
-    // Method to submit the form
-    submitForm() {
-      axios
-        .post('/register', this.formData) // Send form data to Flask backend
-        .then(response => {
-          console.log('Registration successful', response);   
-            window.location.href = `/login`; // Redirect to professional home after successful registration
-          }
-        )
-        .catch(error => {
-          console.error('Error during registration', error);
-        });
-    }
   },
   mounted() {
     this.fetchServices(); // Fetch available services when the component is mounted
@@ -58,6 +71,15 @@ export default {
   template: `
     <div class="container mt-5">
       <h2 class="text-center">Register</h2>
+        <!-- Success message -->
+        <div v-if="successMessage" class="alert alert-success">
+          {{ successMessage }}
+        </div>
+
+        <!-- Error message -->
+        <div v-if="errorMessage" class="alert alert-danger">
+          {{ errorMessage }}
+        </div>
       
         <!-- Username -->
         <div class="mb-3">
@@ -128,8 +150,20 @@ export default {
             <input type="number" class="form-control" id="experience" v-model="formData.experience" min="0">
           </div>
         </div>
+                  
+        <button type="submit" @click="submitForm" class="btn btn-dark" :disabled="loading">
+          {{ loading ? 'Loading...' : 'Register' }}
+        </button>
 
-        <button type="submit" class="btn btn-primary" @submit.prevent="submitForm">Register</button>
+        <!-- Success message -->
+        <div v-if="successMessage" class="alert alert-success">
+          {{ successMessage }}
+        </div>
+
+        <!-- Error message -->
+        <div v-if="errorMessage" class="alert alert-danger">
+          {{ errorMessage }}
+        </div>
       
     </div>
   `

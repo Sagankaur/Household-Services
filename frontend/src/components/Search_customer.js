@@ -13,20 +13,27 @@ export default {
         results: [],
         isBooking: false,
         selectedProfessional: null,
-        userId: this.$route.params.userId || null
+        userId: this.$route.params.userId || null,
+        services: []
       }
     },
 
     mounted() {
         // const userId = this.$route.params.userId;
         // const role = this.$route.params.role;
+        this.fetchServices();
         this.searchServices();  
     },
 
     methods:{
         async searchServices() {
             try {
-                const response = await axios.post(`/search_customer/${this.userId}`, this.searchCriteria);
+                const token = this.$store.getters.authToken; // Use Vuex state
+                const response = await axios.post(`/search_customer`, this.searchCriteria, {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                });
                 this.results = response.data.professionals;
             } catch (error) {
                 console.error("Error searching services:", error);
@@ -55,6 +62,19 @@ export default {
             this.isBooking = false;
             this.selectedProfessional = null;
         },
+        async fetchServices() {
+            try {
+              const token = this.$store.getters.authToken;
+              const response = await axios.get('/get_services', {
+                headers: {
+                  Authorization: `Bearer ${token}`
+                }
+              });
+              this.services = response.data.services;
+            } catch (error) {
+              console.error("Error fetching services:", error);
+            }
+        }
     },
     template: `
     <div id="app" class="container mt-5">
@@ -64,9 +84,9 @@ export default {
         <label for="service_name">Service Name:</label>
         <select v-model="searchCriteria.service_name" name="service_name" required>
             <option value="">Select Service</option>
-            {% for service in services %}
-                <option value="{{ service[0] }}">{{ service[0] }}</option>
-            {% endfor %}
+            <option v-for="service in services" :key="service.id" :value="service.name">
+                {{ service.name }}
+            </option>
         </select>
         <br><br>
 
