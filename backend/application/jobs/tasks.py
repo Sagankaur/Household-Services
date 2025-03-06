@@ -59,7 +59,7 @@ def send_monthly_reports():
             html=rendered_report
         )
 
-@shared_task(bind = True, ignore_result = False)
+@shared_task(ignore_result = False) # Remove bind=True
 def export_closed_requests(professional_id): #admin trigerred
     service_requests = ServiceRequest.query.filter_by(
         professional_id=professional_id,

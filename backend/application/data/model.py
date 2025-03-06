@@ -118,7 +118,6 @@ class Customer(db.Model):
     service_requests = db.relationship('ServiceRequest', back_populates='customer') #1 customer=> many service reequests, one to many
     # user = db.relationship('User', back_populates='customer', uselist=False) #no need coz using backref
 
-
     def __repr__(self):
         return f'<Customer {self.user.username}>'
 
@@ -137,32 +136,44 @@ class Professional(db.Model):
 
     # One-to-Many relationship with ServiceRequest
     service_requests = db.relationship('ServiceRequest', back_populates='professional') #ome professioanl=> many service requests
-    
+    service = db.relationship('Service', back_populates='professionals')  # ✅ Fix relationship
+
     @property
     def all_ratings(self):
         # Collect all ratings given to the professional
-        all_ratings = [request.ratings for request in self.service_requests if request.ratings is not None]
-        return all_ratings
+        return [sr.rating for sr in self.service_requests if sr.rating is not None]
 
     def update_ratings_and_reviews(self):
         completed_requests = [sr for sr in self.service_requests if sr.rating is not None]
+        
         if completed_requests:
             total_rating = sum(sr.rating for sr in completed_requests)
             self.ratings = total_rating / len(completed_requests)
             self.total_reviews = len(completed_requests)
-            
-            # Aggregate reviews (limit to last 5 for example)
+
+            # Aggregate reviews (limit to last 5)
             recent_reviews = sorted(completed_requests, key=lambda x: x.date_of_completion or datetime.min, reverse=True)[:5]
-            self.reviews = " | ".join(f"{sr.review}" for sr in recent_reviews if sr.review)
+            self.review = " | ".join(f"{sr.review}" for sr in recent_reviews if sr.review)
         else:
-            self.ratings = None
+            self.ratings = 0.0
             self.total_reviews = 0
-            self.reviews = None
-        
+            self.review = None
+
         db.session.add(self)
         db.session.commit()
     def __repr__(self):
         return f'<Professional {self.user.username}, Service: {self.service.name}>'
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "service_id": self.service_id,
+            "experience": self.experience,
+            "status": self.status,
+            "ratings": self.ratings,
+            "review": self.review,
+            "total_reviews": self.total_reviews,
+            "service_name": self.service.name if self.service else None
+        }
 
 class Service(db.Model):
     __tablename__ = 'service'
@@ -172,7 +183,7 @@ class Service(db.Model):
     price = db.Column(db.Float, nullable=False)
     time_required = db.Column(db.Integer, nullable=True)
 
-    professionals = db.relationship('Professional', backref='professionals')  # One service, many professionals
+    professionals = db.relationship('Professional', back_populates='service')  # One service, many professionals
     service_requests = db.relationship(
         'ServiceRequest',
         back_populates='service',
@@ -181,6 +192,15 @@ class Service(db.Model):
 
     def __repr__(self):
         return f'<Service {self.name}>'
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "price": self.price,
+            "time_required": self.time_required
+        }
 
 
 class ServiceRequest(db.Model):
@@ -222,6 +242,7 @@ class ServiceRequest(db.Model):
     
     def to_dict(self):
         return {
+            "id" : self.id,
             'customer_username': self.customer.user.username,
             'customer_name': self.customer.user.name,
             'c_address': self.customer.user.address,
@@ -230,10 +251,10 @@ class ServiceRequest(db.Model):
             'professional_username': self.professional.user.username if self.professional else None,
             'professional_name': self.professional.user.name if self.professional else None,
             'p_phone': self.professional.user.phone_number if self.professional else None,
-            'service': self.service.name,
+            'service': self.service.name if self.service else None,
             'date_of_request': self.date_of_request.strftime('%Y-%m-%d'),
             'remarks': self.remarks,
-            "service_status": self.service_status,
+            "service_status": self.service_status ,
             'date_of_completion': self.date_of_completion.strftime('%Y-%m-%d') if self.date_of_completion else None,
             'review': self.review if self.date_of_completion else None,
             'rating': self.rating if self.date_of_completion else None

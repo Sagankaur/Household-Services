@@ -384,7 +384,7 @@ export default {
           <h4>Edit Profile</h4>
         </div>
         <div class="card-body">
-          <form @submit.prevent="updateProfile">
+          <form @submit.prevent="updateProfile(userId)">
             <div class="mb-3">
               <label for="username" class="form-label">Username</label>
               <input type="text" id="username" v-model="customer.updatedUser.username" class="form-control" required>
@@ -409,7 +409,7 @@ export default {
               <label for="pincode" class="form-label">Pincode</label>
               <input type="text" id="pincode" v-model="customer.updatedUser.pincode" class="form-control" required>
             </div>
-            <button type="submit" class="btn btn-primary">Update Profile</button>
+            <button type="submit" class="btn btn-primary" @click="updateProfile(userId)">Update Profile</button>
           </form>
           <button @click="cancelEdit" class="btn btn-secondary">Cancel</button>
         </div>
