@@ -119,14 +119,14 @@ export default {
       if (this.userRole === "Admin" && this.userId) {
         return [
           { name: "Home", path: `/home_admin/${this.userId}` },
-          { name: "Search", path: "/search_admin" },
+          { name: "Search", path: `/search_admin/${this.userId}` },
           { name: "Summary", path: `/summary_admin/${this.userId}` },
           { name: "Logout", path: "/login" },
         ];
       } else if (this.userRole === "Customer" && this.userId) {
         return [
           { name: "Customer Home", path: `/home_customer/${this.userId}` },
-          { name: "Search", path: "/search_customer" },
+          { name: "Search", path: `/search_customer/${this.userId}` },
           { name: "Summary", path: `/summary_customer/${this.userId}` },
           { name: "Logout", path: "/login" },
         ];

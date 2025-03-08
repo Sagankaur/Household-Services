@@ -85,3 +85,16 @@ def export_closed_requests(professional_id): #admin trigerred
         body=f"The CSV export for professional {professional_id} is complete. Download it here: {file_path}"
     )
     return file_path
+
+@shared_task(ignore_result=True)
+def cleanup_old_charts():
+    chart_dir = "static/charts"
+    if not os.path.exists(chart_dir):
+        return
+    
+    current_time = datetime.now()
+    for filename in os.listdir(chart_dir):
+        file_path = os.path.join(chart_dir, filename)
+        file_modified = datetime.fromtimestamp(os.path.getmtime(file_path))
+        if (current_time - file_modified).days > 1:
+            os.remove(file_path)

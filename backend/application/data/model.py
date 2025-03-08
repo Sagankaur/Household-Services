@@ -33,8 +33,8 @@ class User(db.Model, UserMixin):
     # Roles relationship
     roles = db.relationship('Role', secondary='rolesusers', backref=db.backref('user', lazy='dynamic'))#Customer, Professional, Admin
     # Relationships with Customer and Professional (One-to-One)
-    customer = db.relationship('Customer', backref='user', uselist=False, cascade='all, delete-orphan') #one to one relationaship between customer and user
-    professional = db.relationship('Professional', backref='user', uselist=False, cascade='all, delete-orphan') #one to one relationaship between professional and user
+    customer = db.relationship('Customer', back_populates='user', uselist=False, cascade='all, delete-orphan') #one to one relationaship between customer and user
+    professional = db.relationship('Professional', back_populates='user', uselist=False, cascade='all, delete-orphan') #one to one relationaship between professional and user
 
     def __repr__(self):
         return f'<User {self.username}, Role: {self.role}>'
@@ -95,12 +95,12 @@ class User(db.Model, UserMixin):
         db.session.add(self)
         db.session.commit()
 
-    def generate_auth_token(self, expires_in=3600):
-        return jwt.encode(
-            {'id': self.id, 'exp': datetime.utcnow() + timedelta(seconds=expires_in)},
-            current_app.config['SECRET_KEY'],
-            algorithm='HS256'
-        )
+    # def generate_auth_token(self, expires_in=3600):
+    #     return jwt.encode(
+    #         {'id': self.id, 'exp': datetime.utcnow() + timedelta(seconds=expires_in)},
+    #         current_app.config['SECRET_KEY'],
+    #         algorithm='HS256'
+    #     )
 
 class Role(db.Model, RoleMixin):
     __tablename__ = 'role'
@@ -116,6 +116,8 @@ class Customer(db.Model):
     __tablename__ = 'customer'
     id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True, unique=True) #if role is Customer than automatically update here
     service_requests = db.relationship('ServiceRequest', back_populates='customer') #1 customer=> many service reequests, one to many
+    user = db.relationship('User', back_populates='customer')
+
     # user = db.relationship('User', back_populates='customer', uselist=False) #no need coz using backref
 
     def __repr__(self):
@@ -137,6 +139,7 @@ class Professional(db.Model):
     # One-to-Many relationship with ServiceRequest
     service_requests = db.relationship('ServiceRequest', back_populates='professional') #ome professioanl=> many service requests
     service = db.relationship('Service', back_populates='professionals')  # ✅ Fix relationship
+    user = db.relationship('User', back_populates='professional')
 
     @property
     def all_ratings(self):
@@ -262,7 +265,7 @@ class ServiceRequest(db.Model):
         }
 
     
-@event.listens_for(ServiceRequest.rating, 'set')
+# @event.listens_for(ServiceRequest.rating, 'set')
 @event.listens_for(ServiceRequest.review, 'set')
 def update_professional_ratings_and_reviews(target, value, oldvalue, initiator):
     if target.professional and (target.rating is not None or target.review):

@@ -2,7 +2,12 @@ from application.controllers.api import *
 
 # Admin Home
 class AdminHome(Resource):
+    @jwt_required()
     def get(self, user_id):
+        user = User.query.get_or_404(user_id)
+        if user.roles[0].name.lower() != "admin":
+            return {"message": "Access denied. Admin only."}
+
         services = [ser.to_dict() for ser in Service.query.all()]
         pending_professionals = [
             {**pp.user.to_dict(), **pp.to_dict()}  # Merge user and professional info
@@ -17,12 +22,14 @@ class AdminHome(Resource):
         ]
 
         pending_requests = [sr.to_dict() for sr in ServiceRequest.query.filter_by(service_status='pending').all()]
-
+        admin = User.query.filter_by(id=user_id).first()
+        admin = admin.to_dict()
         return jsonify({
             'services': services,
             'pending_professionals': pending_professionals,
             'low_rated_professionals': low_rated_professionals,
-            'pending_requests': pending_requests
+            'pending_requests': pending_requests,
+            'admin': admin
         })
 # {"low_rated_professionals": [{},],"pending_professionals": [{},{}..],
 # "pending_requests": [{},{}..],"services": [{},{}..]}
@@ -95,7 +102,7 @@ class ActionProf(Resource):
         return jsonify({'message': f'Action {action} performed on professional {id}'})
 
 # View Service Request
-class AdminRequestView(Resource):
+class RequestView(Resource):
     def get(self, id):
         service_request = ServiceRequest.query.get(id)
         if not service_request:
@@ -115,7 +122,11 @@ class AdminRequestDelete(Resource):
         return jsonify({'message': 'Service request deleted successfully'})
 
 class AdminSearch(Resource):
+    @jwt_required()
     def get(self, user_id):  # Adding user_id parameter to match the endpoint
+        user = User.query.get_or_404(user_id)
+        if user.roles[0].name.lower() != "admin":
+            return {"message": "Access denied. Admin only."}
         search_type = request.args.get('search_type')
         query = request.args.get('query')
 
@@ -184,12 +195,15 @@ class AdminViewCustomer(Resource):
 # {"customer": {},service_requests:[{},{}]}
 
 class AdminSummary(Resource):
-    # @cache.cached(key_prefix=lambda: 'summary_admin', timeout=3000)
+    @jwt_required()
+    @cache.memoize(timeout=300)
+    
     def get(self, user_id):
-        # if 'user_id' not in session or session.get('role') != 'admin':
-        #     return redirect(url_for('routes.adminlogin'))
+        user = User.query.get_or_404(user_id)
+        if user.roles[0].name.lower() != "admin":
+            return {"message": "Access denied. Admin only."}
+        uniq = user.fs_uniquifier
 
-        # Calculate overall profesional ratings (average rating per user)
         ratings_data = db.session.query(
             Professional.id, func.avg(Professional.ratings).label('avg_rating')
         ).group_by(Professional.id).all()
@@ -208,15 +222,17 @@ class AdminSummary(Resource):
         request_counts = [status[1] for status in service_request_summary]
 
         # Generate the charts
-        bar_graph_path_admin = self.generate_bar_graph_admin(ratings, users)
-        pie_chart_path_admin = self.generate_pie_chart_admin(request_status, request_counts)
+        bar_graph_path_admin = self.generate_bar_graph_admin(ratings, users,uniq)
+        pie_chart_path_admin = self.generate_pie_chart_admin(request_status, request_counts,uniq)
 
         return jsonify({
             'bar_graph_path_admin': bar_graph_path_admin,
             'pie_chart_path_admin': pie_chart_path_admin
         })
 
-    def generate_bar_graph_admin(self, ratings, users):
+    @staticmethod
+    @cache.memoize(timeout=300)
+    def generate_bar_graph_admin(ratings, users, uniq):
         ratings = [r if r is not None else 0 for r in ratings]
 
         fig, ax = plt.subplots()
@@ -226,18 +242,20 @@ class AdminSummary(Resource):
         ax.set_title('Customer Ratings Summary')
         ax.set_xticklabels(users, rotation=45, ha="right")
 
-        graph_path = os.path.join('static', 'charts', f'bar_graph_admin_{datetime.now().strftime("%Y%m%d%H%M%S")}.png')
+        graph_path = os.path.join('static', 'charts', f'bar_graph_admin_{uniq}.png')
         os.makedirs(os.path.dirname(graph_path), exist_ok=True)
         fig.tight_layout()
         fig.savefig(graph_path)
         return graph_path
-
-    def generate_pie_chart_admin(self, request_status, request_counts):
+    
+    @staticmethod
+    @cache.memoize(timeout=300)
+    def generate_pie_chart_admin(request_status, request_counts, uniq):
         fig, ax = plt.subplots()
         ax.pie(request_counts, labels=request_status, autopct='%1.1f%%', startangle=90, colors=['#FF6347', '#4CAF50', '#FFD700', '#1E90FF'])
         ax.set_title('Service Request Status')
 
-        pie_chart_path = os.path.join('static', 'charts', f'pie_chart_admin_{datetime.now().strftime("%Y%m%d%H%M%S")}.png')
+        pie_chart_path = os.path.join('static', 'charts', f'pie_chart_admin_{uniq}.png')
         os.makedirs(os.path.dirname(pie_chart_path), exist_ok=True)
         fig.savefig(pie_chart_path)
         return pie_chart_path

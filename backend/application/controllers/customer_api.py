@@ -1,11 +1,13 @@
 from application.controllers.api import *
 
 class CustomerHome(Resource):
-    # method_decorators = [customer_required]
-
+    @jwt_required()
     def get(self, user_id):
         """Fetch customer details and service history."""
         user = User.query.get_or_404(user_id)
+        if user.roles[0].name.lower() != "customer":
+            return {"message": "Access denied. Customer only."}
+
         service_requests = ServiceRequest.query.filter_by(customer_id=user_id).all()
 
         service_data = [request.to_dict() for request in service_requests]
@@ -26,17 +28,20 @@ class CustomerHome(Resource):
         }
 
         return jsonify(response)
-
+    
+    @jwt_required()
     def put(self, user_id):
         """Update customer profile details."""
         data = request.json
         user = User.query.get_or_404(user_id)
+        if user.roles[0].name.lower() != "customer":
+            return {"message": "Access denied. Customer only."}
 
         # Check if email is already in use by another user (excluding the current user)
         if "email" in data and data["email"] != user.email:
             existing_user = User.query.filter_by(email=data["email"]).first()
             if existing_user and existing_user.id != user.id:
-                return jsonify({"error": "Email already in use"}), 400  # Bad request
+                return jsonify({"error": "Email already in use"})  # Bad request
 
         user.name = data.get("name", user.name)
         user.email = data.get("email", user.email)
@@ -49,6 +54,7 @@ class CustomerHome(Resource):
         return jsonify({"message": "Profile updated successfully!"})
 
 class CustomerSearch(Resource):
+    @jwt_required()
     def post(self, user_id):
         """Search professionals based on service, pincode, rating, or address."""
         
@@ -184,13 +190,17 @@ class ServiceClosure(Resource):
         return jsonify({"message": "Service request closed and review submitted successfully."})
 
 class CustomerSummary(Resource):
-    # method_decorators = [customer_required]
-
-    # @cache.cached(key_prefix=lambda: f'summary_customer_{user_id}', timeout=3000)
+    @jwt_required()
+    @cache.memoize(timeout=300)
     def get(self, user_id):
         """Generate a summary of the customer's service requests."""
         # customer_id = session.get('user_id')
         customer_id = user_id
+        user = User.query.get(user_id)        
+        if user.roles[0].name.lower() != "customer":
+            return {"message": "Access denied. Customer only."}
+
+        uniq = user.fs_uniquifier
 
         # Fetch status counts
         status_counts = db.session.query(ServiceRequest.service_status, db.func.count(ServiceRequest.id))\
@@ -201,10 +211,12 @@ class CustomerSummary(Resource):
         labels = [status for status, count in status_counts]
         counts = [count for status, count in status_counts]
 
-        bar_graph_path = self.generate_service_status_chart(labels, counts)
+        bar_graph_path = self.generate_service_status_chart(labels, counts,uniq)
         return jsonify({'bar_graph_path': bar_graph_path})
-
-    def generate_service_status_chart(self, labels, counts):
+    
+    @staticmethod
+    @cache.memoize(timeout=300)
+    def generate_service_status_chart(labels, counts,uniq):
         """Generate a bar chart for service request status."""
         fig, ax = plt.subplots()
         ax.bar(labels, counts, color=['#FF9999', '#66B2FF', '#99FF99'])
@@ -217,7 +229,7 @@ class CustomerSummary(Resource):
         fig.savefig(img_io, format='png')
         img_io.seek(0)
 
-        chart_path = os.path.join('static', 'charts', f'bar_chart_cust_{datetime.now().strftime("%Y%m%d%H%M%S")}.png')
+        chart_path = os.path.join('static', 'charts', f'bar_chart_cust_{uniq}.png')
         os.makedirs(os.path.dirname(chart_path), exist_ok=True)
 
         with open(chart_path, 'wb') as f:

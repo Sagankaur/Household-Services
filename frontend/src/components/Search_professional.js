@@ -1,3 +1,4 @@
+//if, wrong param prvided,still giving all the requests
 import axios from 'axios';
 
 export default {
@@ -16,44 +17,80 @@ export default {
             serviceRequests: []
         }
     },
-    mounted() {
-        this.userId = this.$route.params.userId;
-        this.fetchData();
+    created() {
+        this.userId = this.$store.getters.userId;
+        // console.log("userId from route:", this.$route.params.userId);
+        console.log("userId from store:", this.$store.getters.userId);
+        console.log("final userId:", this.userId);
+        if (this.userId) {
+            this.searchRequests();
+        } else {
+            console.error("No userId found in route params or store");
+            // Redirect to login or handle this error case
+        }
     },
     methods: {
-        async fetchData() {
-            await this.fetchRequests(this.userId);
+        async searchRequests() {
+            await this.fetchRequests(); //{"requests": [{},{}..]}
+            this.serviceRequests = this.Requests;
         },
-        async fetchRequests(userId) {
+        async fetchRequests() {
             try {
                 const token = this.$store.getters.authToken; // Use Vuex state
-                const response = await axios.get(`http://localhost:5000/search_professional/${userId}`, {
+                let params = {};
+                
+                // if (this.search.date) {
+                //     params.search_type = 'date';
+                //     params.value = this.search.date;
+                // } else if (this.search.address) {
+                //     params.search_type = 'address';
+                //     params.value = this.search.address;
+                // } else if (this.search.pincode) {
+                //     params.search_type = 'pincode';
+                //     params.value = this.search.pincode;
+                // }
+                if (this.search.date) params.date = this.search.date;
+                if (this.search.address) params.address = this.search.address;
+                if (this.search.pincode) params.pincode = this.search.pincode;
+
+                const response = await axios.get(`http://localhost:5000/search_professional/${this.userId}`, {
+                    params: params,
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
                 });
-                this.Requests = response.data.requests;
+                this.Requests = response.data.requests || [];
+                console.log("Requests", this.Requests)
+
+                if (this.Requests.length === 0) {
+                    this.error = "No matching service requests found.";
+                }
             } catch (error) {
                 console.error("Error fetching data:", error);
             }
         },    
         async viewRequest(id) {
-            const response = await fetch(`/view_request/${id}`);
-            const data = await response.json();
-            this.selectedRequest = data;
-            this.showRequestModal = true;
+            try {
+                const response = await fetch(`/view_request/${id}`);
+                if (!response.ok) throw new Error("Failed to fetch request details");
+                const data = await response.json();
+                this.selectedRequest = data;
+                this.showRequestModal = true;
+            } catch (error) {
+                console.error("Error viewing request:", error);
+            }
         },
         closeModal() {
             this.showRequestModal = false;
-        },
-        async searchRequests() {  
-            // Implement your search logic here
-            this.serviceRequests = this.Requests;
         }
+        // async searchRequests() {  
+        //     // Implement your search logic here
+        //     this.serviceRequests = this.Requests;
+        // }
     },
     template:
     `
-        <div id="app" class="container mt-5">
+    <div id="app" class="container mt-5">
         <h2>Search Service Requests</h2>
         <form @submit.prevent="searchRequests">
             <div class="row">
@@ -89,7 +126,7 @@ export default {
         <!-- Display search results -->
         <div v-if="serviceRequests.length > 0" class="mt-5">
             <h3>Search Results</h3>
-            <table class="table table-bordered">
+            <table class="table table-striped">
                 <thead>
                     <tr>
                         <th>ID</th>

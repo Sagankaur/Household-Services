@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash
 from flask_caching import Cache
 from flask_cors import CORS
 
+from application.extension import cache
 from application.config import LocalDevelopmentConfig
 from application.data.model import *
 
@@ -21,10 +22,10 @@ from application.controllers.admin_api import *
 app = None
 api = None
 celery = None
-cache = None
+# cache = None
 
 def create_app():
-    app = Flask(__name__, template_folder="templates")
+    app = Flask(__name__, static_folder='static', static_url_path='/static')
     CORS(app, resources={r"/*": {"origins": "http://localhost:8080"}}, 
         supports_credentials=True, 
         allow_headers=["Content-Type", "Authorization"], 
@@ -32,6 +33,9 @@ def create_app():
 
     app.config.from_object(LocalDevelopmentConfig)
     db.init_app(app)
+
+    # app.config.from_object(Config)  # Assuming you have a Config class in config.py
+    cache.init_app(app)
 
     with app.app_context():
     # app.app_context().push()
@@ -42,7 +46,6 @@ def create_app():
         api.add_resource(AdminServiceUpdate, '/update_service/<int:service_id>')
         # api.add_resource(AdminServiceGet, '/get_services')
         api.add_resource(ActionProf, '/action_professional/<int:id>/<action>')
-        api.add_resource(AdminRequestView, '/view_request/<int:id>') #home_prof
         api.add_resource(AdminRequestDelete, '/delete_request/<int:request_id>')
         api.add_resource(AdminSearch, '/search_admin/<int:user_id>')
         api.add_resource(AdminViewProfessional, '/view_professional/<int:id>')
@@ -50,6 +53,8 @@ def create_app():
         # api.add_resource(AdminViewService, '/view_service/<int:id>')
         api.add_resource(AdminSummary, '/summary_admin/<int:user_id>')
         api.add_resource(AdminCSV, '/export_csv/<int:professional_id>')
+        
+        api.add_resource(RequestView, '/view_request/<int:id>') #home_prof,home_cust
 
         api.add_resource(ProfessionalHome, "/home_professional/<int:user_id>",methods=["GET", "PUT"])
         # api.add_resource(ProfessionalProfile, "/edit_profile_prof")
@@ -67,11 +72,9 @@ def create_app():
 
         # print("Routes added:", api.app.url_map)
 
-    # app.app_context().push()
         jwt = JWTManager(app)
         datastore = SQLAlchemySessionUserDatastore(db.session, User, Role)
         app.security = Security(app, datastore)
-    # app.app_context().push()
     
         celery=workers.celery
         celery.conf.update(
@@ -82,10 +85,7 @@ def create_app():
         )
 
         celery.Task=workers.ContextTask
-    # app.app_context().push()
-        cache=Cache(app)
-    # app.app_context().push()
-
+    
     return app, api, celery, cache
 
 

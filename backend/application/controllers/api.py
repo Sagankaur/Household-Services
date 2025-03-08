@@ -23,12 +23,13 @@ from sqlalchemy import cast, String
 
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from werkzeug.security import generate_password_hash, check_password_hash
+from application.extension import cache
 
 #from app import cache
 from application.data.model import *
 from flask import Blueprint, current_app
 
-cache = Cache()
+# cache = Cache()
 routes = Blueprint('routes', __name__)
 api=Api(routes)
 

@@ -22,3 +22,10 @@ def register_periodic_tasks(celery_app):
             send_monthly_reports.s(),
             name='Send monthly reports to customers'
         )
+
+        sender.add_periodic_task(
+            crontab(hour=0, minute=0),
+            cleanup_old_charts.s(),
+            name='Cleanup old charts'
+        )
+

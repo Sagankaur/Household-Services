@@ -31,7 +31,8 @@ export default createStore({
     }
   },
   getters: {
-    isAuth: state => state.authToken,
+    authToken: state => state.authToken,  // This should return the token
+    isAuth: state => !!state.authToken,
     userRole: state => state.role,
     userId: state => state.userId
   }

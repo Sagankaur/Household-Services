@@ -1,14 +1,18 @@
 from application.controllers.api import *
+from sqlalchemy.orm import joinedload
 
 class ProfessionalHome(Resource):
-        
+    @jwt_required()
     def get(self, user_id):
-        print(f"Fetching user with ID: {user_id}")
+        print("Headers:", request.headers)
+        print(f"Fetching Prof with ID: {user_id}")
         user = User.query.get_or_404(user_id)
         professional = Professional.query.filter_by(id=user.id).first_or_404()
         print(f"Fetching professional with ID: {user.id}")
-
-
+        
+        if user.roles[0].name.lower() != "professional":
+            return {"message": "Access denied. Professionals only."}
+        
         requests = {
             "pending": "pending",
             "accepted": "accepted",
@@ -27,11 +31,11 @@ class ProfessionalHome(Resource):
                 .order_by(ServiceRequest.date_of_request.desc())
                 .all()
             ]
-
-
         return jsonify(response_data)
 
+    @jwt_required()
     def put(self, user_id):
+        
         parser = reqparse.RequestParser()
         parser.add_argument("username", type=str)
         parser.add_argument("name", type=str)
@@ -46,6 +50,10 @@ class ProfessionalHome(Resource):
         args = parser.parse_args()
 
         user = User.query.get_or_404(user_id)
+        
+        if user.roles[0].name.lower() != "professional":
+            return {"message": "Access denied. Professionals only."}
+
         professional = Professional.query.filter_by(id=user.id).first_or_404()
 
         for key, value in args.items():
@@ -66,8 +74,12 @@ class ProfessionalHome(Resource):
 
 class ServiceRequestAction(Resource):
     # method_decorators = [professional_required]
-    # @jwt_required()
+    @jwt_required()
     def post(self, user_id, request_id, action):
+        user = User.query.get_or_404(user_id)        
+        if user.roles[0].name.lower() != "professional":
+            return {"message": "Access denied. Professionals only."}
+
         if action not in ["accept", "reject"]:
             return {"error": "Invalid action"}, 400
 
@@ -82,77 +94,71 @@ class ServiceRequestAction(Resource):
 
         return {"message": f"Request {action}ed successfully"}
 
-class ProfessionalSearch(Resource):  
-    #can search for its Service requests only via customer fields, service_name, service reques fields
-    #will return all the values assoiciated with service req
-
+class ProfessionalSearch(Resource):
+    @jwt_required()
     def get(self, user_id):
         search_type = request.args.get("search_type")
-        query = request.args.get("query")
+        search_value = request.args.get("value")
 
-        # If no search type or query, return all service requests for this professional
-        if not search_type and not query:
-            service_requests = ServiceRequest.query.filter_by(professional_id=user_id).all()
-            return jsonify({"requests": [sr.to_dict() for sr in service_requests]})
+        user = User.query.get_or_404(user_id)        
+        if user.roles[0].name.lower() != "professional":
+            return {"message": "Access denied. Professionals only."}
 
-        search_map = {
-            "Service": (Service, ["name"]),  
-            "Service Request": (ServiceRequest, ["service_status"]),  
-            "Customer": (User, ["username", "email"])  
-        }
+        # Base query: Filter by professional_id
+        query = ServiceRequest.query.filter(ServiceRequest.professional_id == user_id)
 
-        if search_type not in search_map:
-            return jsonify({"error": "Invalid search type"})
+        # Apply filters dynamically
+        if search_type and search_value:
+            if search_type == "date":
+                query = query.filter(ServiceRequest.date_of_request == search_value)
+            elif search_type == "address":
+                query = query.join(ServiceRequest.customer).join(Customer.user).filter(User.address.ilike(f"%{search_value}%"))
+            elif search_type == "pincode":
+                query = query.join(ServiceRequest.customer).join(Customer.user).filter(User.pincode == search_value)
+            else:
+                return jsonify({"error": "Invalid search type"})
 
-        model, extra_fields = search_map[search_type]
-        filters = [getattr(model, field).ilike(f"%{query}%") for field in extra_fields if hasattr(model, field)]
+        # Execute the query
+        results = query.options(joinedload(ServiceRequest.customer).joinedload(Customer.user)).all()
 
-        if search_type == "Customer":
-            # Restrict to Customers linked via ServiceRequest and return ServiceRequest details
-            results = (
-                ServiceRequest.query
-                .join(User, ServiceRequest.customer_id == User.id)
-                .filter(ServiceRequest.professional_id == user_id, or_(*filters))
-                .all()
-            )
-            return jsonify({"requests": [sr.to_dict() for sr in results]})
-        
-        if search_type == "Service":
-            # Find ServiceRequests where the service name matches
-            service_requests = (
-                ServiceRequest.query
-                .join(Service, ServiceRequest.service_id == Service.id)
-                .filter(ServiceRequest.professional_id == user_id, Service.name.ilike(f"%{query}%"))
-                .all()
-            )
-            return jsonify({"requests": [sr.to_dict() for sr in service_requests]})
+        # Handle empty results
+        if not results:
+            return jsonify({
+                "status": "success",
+                "message": "No service requests found",
+                "data": []
+            })
 
-        if search_type == "Service Request":
-            # Search only ServiceRequests linked to the professional
-            results = (
-                ServiceRequest.query.filter(ServiceRequest.professional_id == user_id)
-                .filter(or_(*filters))
-                .all()
-            )
-            return jsonify({"requests": [sr.to_dict() for sr in results]})
-
-        return jsonify({"error": "Invalid request"})
+        # Return serialized data
+        return jsonify({
+            "requests": [sr.to_dict() for sr in results]
+        })
+# {"requests": [{},{}..]}
 
 class ProfessionalSummary(Resource):
     # method_decorators = [professional_required]
-
+    @jwt_required()
+    @cache.memoize(timeout=300)
     def get(self, user_id):
+
         professional = Professional.query.get(user_id)
+        user = User.query.get(user_id)        
+        if user.roles[0].name.lower() != "professional":
+            return {"message": "Access denied. Professionals only."}
+
+        uniq = user.fs_uniquifier
         if not professional:
-            return jsonify({"error": "Professional not found"}), 404
+            return jsonify({"error": "Professional not found"})
 
         # Get ratings
         ratings = db.session.query(ServiceRequest.rating).filter_by(professional_id=professional.id).all()
-    
+
         rating_counts = [0] * 5  # 1 to 5 stars
         for rating in ratings:
             if rating[0] is not None:
-                rating_counts[rating[0] - 1] += 1
+                index = int(rating[0]) - 1  # Convert to integer
+                if 0 <= index < 5:  # Ensure index is within valid range (0-4)
+                    rating_counts[index] += 1
 
         valid_ratings = [rating[0] for rating in ratings if rating[0] is not None]  # Filter out None values
         average_rating = sum(valid_ratings) / len(valid_ratings) if valid_ratings else 0  # Avoid division by zero
@@ -169,12 +175,14 @@ class ProfessionalSummary(Resource):
                 status_counts[status[0]] += 1
 
         return {
-            "pie_chart_prof": str(self.generate_pie_chart_prof(rating_counts)),
-            "bar_chart_prof": str(self.generate_bar_chart_prof(status_counts)),
+            "pie_chart_prof": str(self.generate_pie_chart_prof(rating_counts,uniq)),
+            "bar_chart_prof": str(self.generate_bar_chart_prof(status_counts,uniq)),
             "average_rating": average_rating,
-        }, 200
-
-    def generate_pie_chart_prof(self, rating_counts):  
+        }
+    
+    @staticmethod
+    @cache.memoize(timeout=300)  # Cache for 5 minutes
+    def generate_pie_chart_prof(rating_counts,uniq):  
         labels = ["1 Star", "2 Stars", "3 Stars", "4 Stars", "5 Stars"]
         colors = ["#FF9999", "#FFCC99", "#FFFF99", "#99FF99", "#66B2FF"]
         
@@ -189,13 +197,17 @@ class ProfessionalSummary(Resource):
         ax.pie(rating_counts, labels=labels, colors=colors, autopct="%1.1f%%", startangle=90)
         ax.set_title("Ratings Distribution")
 
-        path = f"static/charts/pie_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+        # path = f"static/charts/pie_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+        # path = os.path.join("backend", "static", "charts", f"pie_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png")
+        path = f"static/charts/pie_chart_prof_{uniq}.png"
+
         os.makedirs(os.path.dirname(path), exist_ok=True)
         fig.savefig(path)
 
         return path
-
-    def generate_bar_chart_prof(self, status_counts):
+    @staticmethod
+    @cache.memoize(timeout=300)  # Cache for 5 minutes
+    def generate_bar_chart_prof(status_counts, uniq):
         labels, values = zip(*status_counts.items())
         colors = ["#66B2FF", "#99FF99", "#FF9999"]
 
@@ -205,8 +217,31 @@ class ProfessionalSummary(Resource):
         ax.set_ylabel("Number of Requests")
         ax.set_title("Service Request Status")
 
-        path = f"static/charts/bar_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        fig.savefig(path)
-
+        # path = os.path.join("backend", "static", "charts", f"bar_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png")
+        # path = f"static/charts/bar_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+        path = f"static/charts/bar_chart_prof_{uniq}.png"
+        
+        if not os.path.exists(path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            fig.savefig(path)
+        
         return path
+
+    @staticmethod
+    def clear_cache(user_id):
+        cache.delete_memoized(ProfessionalSummary.get, user_id)
+        cache.delete_memoized(ProfessionalSummary.generate_pie_chart_prof, [], user_id)  # ✅ Corrected
+        cache.delete_memoized(ProfessionalSummary.generate_bar_chart_prof, {}, user_id)  # ✅ Corrected
+
+    # @staticmethod
+    # def cleanup_old_charts():
+    #     chart_dir = "static/charts"
+    #     if not os.path.exists(chart_dir):
+    #         return
+        
+    #     current_time = datetime.now()
+    #     for filename in os.listdir(chart_dir):
+    #         file_path = os.path.join(chart_dir, filename)
+    #         file_modified = datetime.fromtimestamp(os.path.getmtime(file_path))
+    #         if (current_time - file_modified).days > 1:
+    #             os.remove(file_path)

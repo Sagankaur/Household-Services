@@ -7,22 +7,29 @@ export default {
         pie_chart_path_admin: null,
       };
     },
-  
-    mounted() {
-      const userId = this.$route.params.user_id;  // Ensure user_id is passed as part of the route
-      if (userId) {
-        this.fetchChartData(userId);
+    created() {
+      this.userId = this.$store.getters.userId;
+      // console.log("userId from route:", this.$route.params.userId);
+      console.log("userId from store:", this.$store.getters.userId);
+      console.log("final userId:", this.userId);
+      if (this.userId) {
+          this.fetchChartData();
       } else {
-        console.error('User ID is not available');
+          console.error("No userId found in route params or store");
+          // Redirect to login or handle this error case
       }
     },
   
     methods: {
-      async fetchChartData(userId) {
+      async fetchChartData() {
         try {
+          const token = this.$store.getters.authToken;
           // Make an API call to get the chart data
-          const response = await axios.get(`/summary_admin/${userId}`);
-          
+          const response = await axios.get(`/summary_admin/${this.userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+            });
           // Store the chart image path
           this.bar_graph_path_admin = response.data.bar_graph_path_admin;
           this.pie_chart_path_admin = response.data.pie_chart_path_admin;
@@ -36,13 +43,13 @@ export default {
     template: `
       <div id="app" class="container mt-5">
         <h2>Admin Summary</h2>
-        <div>
+        <div class='bar_chart'>
           <h3>Status Counts</h3>
           <!-- Display the chart image fetched from the backend -->
           <img v-if="bar_graph_path_admin" :src="bar_graph_path_admin" alt="Customer Ratings Bar Chart">
           <p v-else>Loading chart...</p>
         </div>
-        <div>
+        <div class ='pie_chart'>
           <h3>Ratings</h3>
           <!-- Display the chart image fetched from the backend -->
           <img v-if="pie_chart_path_admin" :src="pie_chart_path_admin" alt="Service Request Status Pie">

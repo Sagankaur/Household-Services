@@ -62,7 +62,8 @@ def commonlogin():
             return jsonify({"error": "Access Denied. Admins cannot log in here."}), 403
 
         if check_password_hash(user.password, password):
-            token = user.generate_auth_token()   # Assume this method exists on your user model
+            # token = user.generate_auth_token()   # Assume this method exists on your user model
+            token = create_access_token(identity=str(user.id))
             return jsonify({'token': token, 'userId': user.id, 'role': role}), 200
         else:
             return jsonify({"error": "Invalid credentials"}), 401
@@ -133,12 +134,12 @@ def get_services():
 
         # If no services, return an empty list
         if not services:
-            return jsonify([]), 200
+            return jsonify([])
 
         # Convert the services data to a list of dictionaries (make sure to adjust the fields)
         services_data = [service.to_dict() for service in services]
 
-        return jsonify(services_data), 200
+        return jsonify(services_data)
 
     except Exception as e:
         # Handle any errors and return an appropriate response
@@ -178,11 +179,18 @@ def adminlogin():
             return jsonify({"error": "Access Denied. Only Admins can log in here."}), 403
 
         if check_password_hash(user.password, password):
-            token = user.generate_auth_token()   # Assume this method exists on your user model
+            # token = user.generate_auth_token()   # Assume this method exists on your user model
+            token = create_access_token(identity=str(user.id))
             return jsonify({'token': token, 'userId': user.id, 'role': role}), 200
         else:
-            return jsonify({"error": "Invalid credentials"}), 401
+            return jsonify({"error": "Invalid credentials"})
 
     except Exception as e:
         print(f"Login error: {str(e)}")  # Log the error
         return jsonify({"error": "An unexpected error occurred"}), 500
+
+# from flask import send_from_directory
+
+# @routes.route('/static/charts/<filename>')
+# def serve_chart(filename):
+#     return send_from_directory(/static/charts/filename)

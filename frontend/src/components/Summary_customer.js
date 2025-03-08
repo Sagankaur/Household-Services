@@ -7,20 +7,31 @@ export default {
       };
     },
   
-    mounted() {
-      const userId = this.$route.params.userId;
-      // const role = this.$route.params.role;
-      this.fetchChartData(userId);
+    created() {
+      this.userId = this.$store.getters.userId;
+      // console.log("userId from route:", this.$route.params.userId);
+      console.log("userId from store:", this.$store.getters.userId);
+      console.log("final userId:", this.userId);
+      if (this.userId) {
+          this.fetchChartData();
+      } else {
+          console.error("No userId found in route params or store");
+          // Redirect to login or handle this error case
+      }
     },
   
     methods: {
-      async fetchChartData(userId) {
+      async fetchChartData() {
         try {
-          // Make an API call to get the chart data
-          const response = await axios.get(`/summary_customer/${userId}`);
-          
-          // Store the chart image path
+          const token = this.$store.getters.authToken;
+          const response = await axios.get(`/summary_customer/${this.userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+            });
           this.bar_graph_path_customer = response.data.bar_graph_path_customer;
+          console.log("bar_graph_path_customer:", this.bar_graph_path_customer);
+        
         } catch (error) {
           console.error('Error fetching service status data:', error);
         }
@@ -30,8 +41,8 @@ export default {
     template: `
       <div id="app" class="container mt-5">
         <h2>Customer Summary</h2>
-        <div>
-          <h3>Service Request Status Overview</h3>
+        <div class ='bar_chart'>
+          <h3>Service Request Status</h3>
           <!-- Display the chart image fetched from the backend -->
           <img v-if="bar_graph_path_customer" :src="bar_graph_path_customer" alt="Service Requests Chart">
           <p v-else>Loading chart...</p>

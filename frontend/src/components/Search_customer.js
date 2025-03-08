@@ -13,66 +13,93 @@ export default {
         results: [],
         isBooking: false,
         selectedProfessional: null,
-        userId: this.$route.params.userId || null,
-        services: []
-      }
+        userId: null,  // Initialize properly
+        services: [],
+        role: null      // Fetch role from Vuex
+      };
+    },
+    
+    created() {
+        this.userId = this.$store.getters.userId;
+        this.role = this.$store.getters.userRole; 
+
+        console.log("User ID:", this.userId);
+        console.log("Role:", this.role);
+
+        if (this.userId) {
+            this.fetchServices();
+            this.searchServices(); 
+        } else {
+            console.error("No userId found. Redirecting to login...");
+            // Implement redirection logic here
+        }
     },
 
-    mounted() {
-        // const userId = this.$route.params.userId;
-        // const role = this.$route.params.role;
-        this.fetchServices();
-        this.searchServices();  
-    },
-
-    methods:{
+    methods: {
         async searchServices() {
             try {
-                const token = this.$store.getters.authToken; // Use Vuex state
-                const response = await axios.post(`/search_customer`, this.searchCriteria, {
-                    headers: {
-                        Authorization: `Bearer ${token}`
+                console.log("Searching services...");
+                const token = this.$store.getters.authToken;
+
+                if (!token) {
+                    console.error("Auth token missing!");
+                    return;
+                }
+
+                const response = await axios.post(
+                    `http://localhost:5000/search_customer/${this.userId}`, 
+                    this.searchCriteria, 
+                    {
+                        headers: { Authorization: `Bearer ${token}` }
                     }
-                });
+                );
+
                 this.results = response.data.professionals;
             } catch (error) {
                 console.error("Error searching services:", error);
             }
         },
+
         async bookService(professional) {
             try {
-            const response = await axios.post(
-                '/book_service', 
-                { professional_id: professional.id, service_id: professional.service_id },
-                { headers: { Authorization: `Bearer ${localStorage.getItem('auth-token')}` } }
-            );
-            alert(response.data.message);
+                const token = this.$store.getters.authToken;
+                if (!token) {
+                    console.error("Auth token missing!");
+                    return;
+                }
+
+                const response = await axios.post(
+                    `http://localhost:5000/book_service/${this.userId}`, 
+                    { professional_id: professional.id, service_id: professional.service_id },
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                alert(response.data.message);
             } catch (error) {
-            if (error.response && error.response.status === 403) {
-                alert("Only customers can book services.");
-            } else {
-                console.error("Error booking service:", error);
+                if (error.response && error.response.status === 403) {
+                    alert("Only customers can book services.");
+                } else {
+                    console.error("Error booking service:", error);
+                }
             }
-        }},
+        },
+
         confirmBooking() {
             alert(`Successfully booked ${this.selectedProfessional.name} for ${this.selectedProfessional.service_name}!`);
             this.closeBooking();
         },
+
         closeBooking() {
             this.isBooking = false;
             this.selectedProfessional = null;
         },
+
         async fetchServices() {
             try {
-              const token = this.$store.getters.authToken;
-              const response = await axios.get('/get_services', {
-                headers: {
-                  Authorization: `Bearer ${token}`
-                }
-              });
-              this.services = response.data.services;
+                const response = await axios.get('http://localhost:5000/get_services');
+                this.services = response.data;
             } catch (error) {
-              console.error("Error fetching services:", error);
+                console.error("Error fetching services:", error);
             }
         }
     },
@@ -106,11 +133,10 @@ export default {
     <!-- Display Search Results -->
     <div v-if="results && results.length" class="mt-4">
         <h3>Available Professionals</h3>
-        <table class="table table-bordered">
+        <table class="table table-striped">
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>Service</th>
                     <th>Address</th>
                     <th>Pincode</th>
                     <th>Rating</th>
@@ -119,11 +145,10 @@ export default {
             </thead>
             <tbody>
                 <tr v-for="professional in results" :key="professional.id">
-                    <td>{{ professional.name }}</td>
-                    <td>{{ professional.service_name }}</td>
-                    <td>{{ professional.address }}</td>
-                    <td>{{ professional.pincode }}</td>
-                    <td>{{ professional.rating }}</td>
+                    <td>{{ professional.user.name }}</td> <!-- ✅ Accessing user.name -->
+                    <td>{{ professional.user.address }}</td>
+                    <td>{{ professional.user.pincode }}</td>
+                    <td>{{ professional.professional.ratings }}</td>
                     <td>
                         <button class="btn btn-success" v-if="role === 'Customer'"  @click="bookService(professional)">Book</button>
                     </td>
@@ -153,4 +178,3 @@ export default {
 </div>    
     `
   }
-  

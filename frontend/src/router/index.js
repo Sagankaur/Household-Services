@@ -13,7 +13,7 @@ const routes = [
 
   // Admin Routes
   { path: '/home_admin/:user_id', component: components.HomeAdmin, meta: { requiresAuth: true, role: 'Admin' } },
-  { path: '/search_admin', component: components.SearchAdmin, meta: { requiresAuth: true, role: 'Admin' } },
+  { path: '/search_admin/:user_id', component: components.SearchAdmin, meta: { requiresAuth: true, role: 'Admin' } },
   { path: '/summary_admin/:user_id', component: components.SummaryAdmin, meta: { requiresAuth: true, role: 'Admin' } },
 
   // Professional Routes
@@ -23,11 +23,30 @@ const routes = [
 
   // Customer Routes
   { path: '/home_customer/:user_id', component: components.HomeCustomer, meta: { requiresAuth: true, role: 'Customer' } },
-  { path: '/search_customer', component: components.SearchCustomer, meta: { requiresAuth: true, role: 'Customer' } },
+  { path: '/search_customer/:user_id', component: components.SearchCustomer, meta: { requiresAuth: true, role: 'Customer' } },
   { path: '/summary_customer/:user_id', component: components.SummaryCustomer, meta: { requiresAuth: true, role: 'Customer' } },
 
+  // //BACKEND 
+  // // Admin: View & Manage Service Requests  
+  // { path: '/view_request/:id', component: components.ViewRequest, meta: { requiresAuth: true, role: 'Admin' } },  
+  // { path: '/delete_request/:request_id', component: components.DeleteRequest, meta: { requiresAuth: true, role: 'Admin' } },  
+
+  // // Professional: Manage Service Requests  
+  // { path: '/service_request_action/:user_id/:request_id/:action', component: components.ServiceRequestAction, meta: { requiresAuth: true, role: 'Professional' } },  
+
+  // { path: '/view_professional/:id', component: components.ViewProfessional, meta: { requiresAuth: true, role: 'Admin' } },  
+  // { path: '/view_customer/:id', component: components.ViewCustomer, meta: { requiresAuth: true, role: 'Admin' } },  
+
+  // { path: '/add_service', component: components.AddService, meta: { requiresAuth: true, role: 'Admin' } },  
+  // { path: '/update_service/:service_id', component: components.UpdateService, meta: { requiresAuth: true, role: 'Admin' } },  
+  
+  // { path: '/book_service/:user_id', component: components.BookService, meta: { requiresAuth: true, role: 'Customer' } },  
+  // { path: '/close_request/:user_id/:request_id', component: components.CloseRequest, meta: { requiresAuth: true, role: 'Customer' } },  
+
+  // { path: '/export_csv/:professional_id', component: components.ExportCSV, meta: { requiresAuth: true, role: 'Admin' } },  
+
   // Catch-all route for 404
-  { path: '/:pathMatch(.*)*', redirect: '/' },
+  // { path: '/:pathMatch(.*)*', redirect: '/' },
 ];
 
 // Create Router
