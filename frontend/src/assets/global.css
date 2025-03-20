@@ -46,7 +46,7 @@ h3 {
   }
   p {
     text-align: center;
-    color: #7f8c8d;
+    color: #00000066;
     font-style: italic;
   }
 
@@ -73,18 +73,7 @@ h3 {
     border-radius: 5px;
   }
   
-  @media (min-width: 768px) {
-    .bar_chart, .pie_chart {
-      display: inline-block;
-      width: calc(50% - 10px);
-      vertical-align: top;
-    }
   
-    .bar_chart {
-      margin-right: 20px;
-    }
-  }
-
 /* profile-overview */
   .profile-overview {
     background-color: #f9f9f9;
@@ -161,6 +150,40 @@ table td:nth-child(even) {
   color: #888;
 }
 
+  
+label[for]:has(+ input[required])::after,
+label[for]:has(+ select[required])::after {
+  content: " *";
+  color: red;
+  font-weight: bold;
+}
 
-  
-  
+button {
+  position: relative;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+button.loading {
+  pointer-events: none; /* Prevent clicking */
+  opacity: 0.6;
+}
+
+button.loading::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border: 2px solid white;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}

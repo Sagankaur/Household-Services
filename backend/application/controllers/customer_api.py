@@ -103,30 +103,28 @@ class CustomerSearch(Resource):
 # {"professionals": [{"professional..1": {} ,"user..1": {}}...{}]}
 
 class ServiceBooking(Resource):
-    # method_decorators = [customer_required]
+    def __init__(self):
+        self.reqparse = reqparse.RequestParser()
+        self.reqparse.add_argument('professional_id', type=int, required=True, help='Professional ID is required')
+        self.reqparse.add_argument('service_id', type=int, required=True, help='Service ID is required')
+        self.reqparse.add_argument('remarks', type=str)
+        super(ServiceBooking, self).__init__()
 
-    def post(self, user_id):
-        """Book a service with a professional."""
-        data = request.json
-        if not data:
-            return jsonify({'error': 'Request body is missing'})
-        professional_id = data.get('professional_id')
-        service_id = data.get('service_id')
-        remarks = data.get('remarks')
-        # user_id = request.user_id  # Extracted from token/session
-
-        if not professional_id or not service_id:
-            return jsonify({'error': 'Professional ID and Service ID are required.'})
+    def post(self, user_id, service_id):
+        args = self.reqparse.parse_args()
+        professional_id = args['professional_id']
+        service_id = args['service_id']
+        remarks = args['remarks']
 
         existing_request = ServiceRequest.query.filter_by(
             customer_id=user_id,
             professional_id=professional_id,
             service_id=service_id,
-            service_status="pending"  # Adjust if needed
+            service_status="pending"
         ).first()
 
         if existing_request:
-            return jsonify({"error": "You already have a pending request with this professional."})
+            return {"error": "You already have a pending request with this professional."}, 400
 
         service_request = ServiceRequest(
             customer_id=user_id,
@@ -136,24 +134,18 @@ class ServiceBooking(Resource):
             service_status='pending',
             remarks=remarks
         )
-        db.session.add(service_request)
-        db.session.commit()
 
-        # # Clear cache after booking
-        # cache.delete(f'summary_admin')
-        # cache.delete(f'summary_customer_{user_id}')
-        # cache.delete(f'summary_professional_{professional_id}')
-
-        return jsonify({"message": "Service successfully booked!"})
+        try:
+            db.session.add(service_request)
+            db.session.commit()
+            return {"message": "Service successfully booked!"}, 201
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            return {"error": "An error occurred while booking the service."}, 500
 
 class ServiceClosure(Resource):
     #see prof- ratings,review,total_reviews vs  service_req - rating , rating
-    # method_decorators = [customer_required]
     
-    # Clear cache (if needed)
-    # cache.delete(f'summary_professional_{service_request.professional_id}')
-    # cache.delete(f'summary_admin')
-
     def put(self, user_id, request_id):
         """Close a service request and provide feedback."""
         service_request = ServiceRequest.query.get(request_id)
@@ -167,7 +159,10 @@ class ServiceClosure(Resource):
         data = request.json
         rating = data.get('rating')
         review = data.get('review')
-
+        try:
+            rating = float(data.get('rating')) 
+        except (ValueError, TypeError):
+            return jsonify({"error": "Invalid rating value. Must be a number."})
         if rating is None or review is None:
             return jsonify({"error": "Rating and review are required."})
 
@@ -191,9 +186,18 @@ class ServiceClosure(Resource):
 
 class CustomerSummary(Resource):
     @jwt_required()
-    @cache.memoize(timeout=300)
     def get(self, user_id):
         """Generate a summary of the customer's service requests."""
+        
+        logging.info(f"Fetching customerAdminSummary for user_id: {user_id}")
+        
+        cache_key = f"customer_summary_{user_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logging.info(f"Cache HIT for {user_id}")
+            return cached_data 
+        logging.info(f"Cache MISS for {user_id}")
+
         # customer_id = session.get('user_id')
         customer_id = user_id
         user = User.query.get(user_id)        
@@ -209,30 +213,39 @@ class CustomerSummary(Resource):
             .all()
 
         labels = [status for status, count in status_counts]
-        counts = [count for status, count in status_counts]
+        counts = [int(count) for status, count in status_counts]
 
         bar_graph_path = self.generate_service_status_chart(labels, counts,uniq)
-        return jsonify({'bar_graph_path': bar_graph_path})
+        
+        response_data={'bar_graph_path': bar_graph_path}
+        cache.set(cache_key, response_data, timeout=300)
+        return jsonify(response_data)
     
     @staticmethod
     @cache.memoize(timeout=300)
-    def generate_service_status_chart(labels, counts,uniq):
+    def generate_service_status_chart(labels, counts, uniq):
+        
         """Generate a bar chart for service request status."""
         fig, ax = plt.subplots()
         ax.bar(labels, counts, color=['#FF9999', '#66B2FF', '#99FF99'])
         ax.set_xlabel('Service Request Status')
         ax.set_ylabel('Count')
         ax.set_title('Service Requests by Status')
-        ax.set_xticklabels(labels, rotation=45, ha="right")
+        # ax.set_xticklabels(labels, ha="right")
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))
 
-        img_io = BytesIO()
-        fig.savefig(img_io, format='png')
-        img_io.seek(0)
+        # Define local file path
+        chart_dir = os.path.join('static', 'charts')
+        os.makedirs(chart_dir, exist_ok=True)  
 
-        chart_path = os.path.join('static', 'charts', f'bar_chart_cust_{uniq}.png')
-        os.makedirs(os.path.dirname(chart_path), exist_ok=True)
+        chart_filename = f'bar_chart_cust_{uniq}.png'
+        chart_path = os.path.join(chart_dir, chart_filename)  
 
-        with open(chart_path, 'wb') as f:
-            f.write(img_io.getvalue())
+        # Save the chart to the local file system
+        fig.savefig(chart_path, format='png')  
 
-        return chart_path
+        # Generate the URL for frontend access
+        bar_chart_url = url_for('routes.serve_chart', filename=chart_filename, _external=True)
+
+        return bar_chart_url  # ✅ RETURN URL FOR FRONTEND USE
+

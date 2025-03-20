@@ -12,6 +12,7 @@ export default {
             pendingProfessionals: [],
             pendingRequests: [],
             lowRatedProfessionals: [],
+
             showModal: false,
             showEditModal: false,
             showProfessionalModal: false,
@@ -72,7 +73,7 @@ export default {
         async addService() {
             try {
                 const response = await axios.post('/add_service', this.newService, {
-                    headers: { 'Content-Type': 'application/json' }
+                    'Authorization': `Bearer ${this.$store.getters.authToken}`
                 });
                 if (response.status === 200) {
                     alert('Service added successfully');
@@ -312,7 +313,7 @@ export default {
             <tbody>
                 <tr v-for="request in pendingRequests" :key="request.id">
                     <td>{{ request.customer_username }}</td>
-                    <td>{{ request.service_name }}</td>
+                    <td>{{ request.service }}</td>
                     <td>
                         <button class="btn btn-info btn-sm" @click="viewRequest(request.id)">View</button>
                         <button class="btn btn-danger btn-sm" @click="deleteRequest(request.id)">Delete</button>

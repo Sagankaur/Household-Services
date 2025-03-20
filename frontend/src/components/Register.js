@@ -4,6 +4,7 @@ export default {
   data() {
     return {
       formData: {
+        name: '',
         username: '',
         email: '',
         password: '',
@@ -16,10 +17,62 @@ export default {
       },
       services: [], // Array to hold the available services,
       successMessage: '',
-      errorMessage: '' 
+      errorMessage: '' ,
+      loading: false, 
+      errors: {},  
     };
   },
   methods: {
+    validateInput() {
+      this.errors = {}; // Reset errors
+    
+      // Username validation
+      if (!this.formData.username.trim() || this.formData.username.length < 3) {
+        this.errors.username = 'Username must be at least 3 characters.';
+      }
+      if (/\s/.test(this.formData.username)) {
+        this.errors.username = 'Username cannot contain spaces.';
+      }
+    
+      // Name validation
+      if (!this.formData.name.trim() || this.formData.name.length < 3 || !/^[a-zA-Z ]+$/.test(this.formData.name)) {
+        this.errors.name = 'Name must be at least 3 letters and contain only alphabets.';
+      }
+    
+      // Email validation
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(this.formData.email)) {
+        this.errors.email = 'Enter a valid email address.';
+      }
+    
+      // Password validation
+      const passwordPattern = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/;
+      if (!passwordPattern.test(this.formData.password)) {
+        this.errors.password = 'Password must be at least 6 characters with 1 uppercase, 1 number, and 1 special character.';
+      }
+    
+      // Phone Number validation
+      if (!/^\d{10}$/.test(this.formData.phone_number)) {
+        this.errors.phone_number = 'Phone number must be 10 digits.';
+      }
+    
+      // Pincode validation
+      if (!/^\d{6}$/.test(this.formData.pincode)) {
+        this.errors.pincode = 'Pincode must be exactly 6 digits.';
+      }
+    
+      // Service Type & Experience validation for Professionals
+      if (this.formData.role === 'Professional') {
+        if (!this.formData.service_type) {
+          this.errors.service_type = 'Please select a service type.';
+        }
+        if (!this.formData.experience || this.formData.experience < 0) {
+          this.errors.experience = 'Experience must be a positive number.';
+        }
+      }
+    
+      return Object.keys(this.errors).length === 0; // ✅ Return false if any errors exist
+    },
     // Method to fetch services from backend
     fetchServices() {
       axios
@@ -32,6 +85,10 @@ export default {
         });
     },
     submitForm() {
+      if (!this.validateInput()) {
+        console.log("Validation failed:", this.errors);
+        return; // ✅ Stop submission if validation fails
+      }
       axios
         .post('http://localhost:5000/register', this.formData)
         .then(response => {
@@ -45,7 +102,7 @@ export default {
             // Optionally, you can set a timeout to redirect to login page after showing the message
             setTimeout(() => {
               this.$router.push("/login");
-            }, 15000); // Redirect after 15 seconds
+            }, 5000); // Redirect after 15 seconds
           } else {
             console.error('Registration failed:', data.message);
             this.errorMessage = data.message || "Registration failed. Please try again.";
@@ -161,9 +218,16 @@ export default {
         </div>
 
         <!-- Error message -->
+        <div v-if="Object.keys(errors).length > 0" class="alert alert-danger">
+          <ul>
+            <li v-for="(error, field) in errors" :key="field">{{ error }}</li>
+          </ul>
+        </div>
+
         <div v-if="errorMessage" class="alert alert-danger">
           {{ errorMessage }}
         </div>
+      
       
     </div>
   `

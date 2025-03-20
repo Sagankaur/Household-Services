@@ -1,4 +1,4 @@
-//experience data not showing; viewRequestModal not showing 
+//experience data not showing
 import axios from 'axios';
 
 export default {
@@ -62,7 +62,8 @@ export default {
                 this.AcceptedRequests = data.accepted_requests;
                 this.CompletedRequests = data.completed_requests;
                 this.user = data.user;
-                this.professional = data.professional;
+                this.professional = data.professional; 
+                console.log(response.data)
                 console.log("professional DATA fetched")
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -232,9 +233,9 @@ export default {
                             v-model="professional.experience"
                         />
                     </div>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="submit" class="btn btn-outline-primary">Save Changes</button>
                 </form>
-                <button @click="cancelEdit" class="btn btn-secondary">Cancel</button>
+                <button @click="cancelEdit" class="btn btn-outline-secondary">Cancel</button>
             </div>
         </div>
 
@@ -245,13 +246,14 @@ export default {
                 <li><strong>Phone:</strong> {{ user.phone_number }}</li>
                 <li><strong>Address:</strong> {{ user.address }}</li>
                 <li><strong>Pincode:</strong> {{ user.pincode }}</li>
+                <li><strong>Experience:</strong> {{ professional.experience }}</li>
             </ul>
-            <button @click="editProfile">Edit Profile</button>
+            <button btn btn-outline-primary @click="editProfile">Edit Profile</button>
         </div>
 
         <!-- Modal for Viewing Service Request Details -->
         <div v-if="showRequestModal" class="modal">
-            <!-- Changed variable name -->
+            <!-- SHOWN -->
             <div class="modal-content">
                 <span class="close" @click="closeModal">&times;</span>
                 <h4>Service Request Details</h4>
@@ -287,7 +289,7 @@ export default {
                             <td>{{ request.date_of_request }}</td>
                             <td>{{ request.c_phone }}</td>
                             <td>
-                                <button class="btn btn-info btn-sm" @click="viewRequest(request.id)">View</button>
+                                <button class="btn btn-outline-primary" @click="viewRequest(request.id)">View</button>
                             </td>
                         </tr>
                     </tbody>
@@ -318,11 +320,11 @@ export default {
                             <td>{{ request.date_of_request }}</td>
                             <td>{{ request.c_phone }}</td>
                             <td>
-                                <button class="btn btn-info btn-sm" @click="approveRequest(request.id)">Approve</button>
-                                <button class="btn btn-info btn-sm" @click="rejectRequest(request.id)">Reject</button>
+                                <button class="btn btn-outline-success" @click="approveRequest(request.id)">Approve</button>
+                                <button class="btn btn-outline-danger" @click="rejectRequest(request.id)">Reject</button>
                             </td>
                             <td>
-                                <button class="btn btn-info btn-sm" @click="viewRequest(request.id)">View</button>
+                                <button class="btn btn-outline-primary" @click="viewRequest(request.id)">View</button>
                             </td>
 
                         </tr>
@@ -355,7 +357,7 @@ export default {
                             <td>{{ request.date_of_request }}</td>
                             <td>{{ request.c_phone }}</td>
                             <td>
-                                <button class="btn btn-info btn-sm" @click="viewRequest(request.id)">View</button>
+                                <button class="btn btn-outline-primary" @click="viewRequest(request.id)">View</button>
                             </td>
                         </tr>
                     </tbody>

@@ -1,7 +1,7 @@
 from flask import Flask, redirect, url_for, request, flash, jsonify, session
 from flask_login import login_user, login_required, current_user, LoginManager, UserMixin, login_user, login_required, logout_user
 from flask import send_file
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, set_access_cookies
 from flask import Blueprint
 from flask_security import verify_password, auth_required, current_user, SQLAlchemyUserDatastore
 from flask_caching import Cache
@@ -64,7 +64,9 @@ def commonlogin():
         if check_password_hash(user.password, password):
             # token = user.generate_auth_token()   # Assume this method exists on your user model
             token = create_access_token(identity=str(user.id))
-            return jsonify({'token': token, 'userId': user.id, 'role': role}), 200
+            response = jsonify({'token': token, 'userId': user.id, 'role': role}) 
+            # set_access_cookies(response, token)
+            return response
         else:
             return jsonify({"error": "Invalid credentials"}), 401
 
@@ -189,8 +191,8 @@ def adminlogin():
         print(f"Login error: {str(e)}")  # Log the error
         return jsonify({"error": "An unexpected error occurred"}), 500
 
-# from flask import send_from_directory
+from flask import send_from_directory
 
-# @routes.route('/static/charts/<filename>')
-# def serve_chart(filename):
-#     return send_from_directory(/static/charts/filename)
+@routes.route('/static/charts/<filename>')
+def serve_chart(filename):
+    return send_from_directory('static/charts',filename)

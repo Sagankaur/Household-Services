@@ -75,12 +75,19 @@ class AdminServiceUpdate(Resource):
             return jsonify({'message': 'Service updated successfully'})
         return jsonify({'error': 'Service not found'})
 
-# Get Services
-# class AdminServiceGet(Resource):
-#     def get(self):
-#         services = Service.query.all()
-#         services_data = [{"id": s.id, "name": s.name, "description": s.description} for s in services]
-#         return jsonify(services_data), 200
+# View Service
+class AdminViewService(Resource): 
+    def get(self, id):
+        service = Service.query.filter_by(id=id).first()
+        if not service:
+            return jsonify({"error": "Service not found"}), 404
+        
+        service_data = {
+            "id": service.id,
+            "name": service.name,
+            "description": service.description
+        }
+        return jsonify(service_data)
 
 # Action on Professional (approve, reject, block)
 class ActionProf(Resource):
@@ -196,9 +203,16 @@ class AdminViewCustomer(Resource):
 
 class AdminSummary(Resource):
     @jwt_required()
-    @cache.memoize(timeout=300)
-    
     def get(self, user_id):
+        logging.info(f"Fetching AdminSummary for user_id: {user_id}")
+        
+        cache_key = f"admin_summary_{user_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logging.info(f"Cache HIT for {user_id}")
+            return cached_data 
+        logging.info(f"Cache MISS for {user_id}")
+
         user = User.query.get_or_404(user_id)
         if user.roles[0].name.lower() != "admin":
             return {"message": "Access denied. Admin only."}
@@ -215,7 +229,7 @@ class AdminSummary(Resource):
 
         # Data for Bar Graph (Customer Ratings)
         ratings = [data.avg_rating for data in ratings_data]
-        users = [f'Professional {data.id}' for data in ratings_data]
+        users = [f'{data.id}' for data in ratings_data]
 
         # Data for Pie Chart (Service Request Summary)
         request_status = [status[0] for status in service_request_summary]
@@ -225,46 +239,71 @@ class AdminSummary(Resource):
         bar_graph_path_admin = self.generate_bar_graph_admin(ratings, users,uniq)
         pie_chart_path_admin = self.generate_pie_chart_admin(request_status, request_counts,uniq)
 
-        return jsonify({
+        response_data ={
             'bar_graph_path_admin': bar_graph_path_admin,
             'pie_chart_path_admin': pie_chart_path_admin
-        })
+        }
+        cache.set(cache_key, response_data, timeout=300)
+        return jsonify(response_data)
 
     @staticmethod
     @cache.memoize(timeout=300)
     def generate_bar_graph_admin(ratings, users, uniq):
-        ratings = [r if r is not None else 0 for r in ratings]
+        """Generate a bar chart for admin summary of customer ratings."""
+        ratings = [float(r) if r is not None else 0 for r in ratings]
 
         fig, ax = plt.subplots()
         ax.bar(users, ratings, color='skyblue')
-        ax.set_xlabel('Customer ID')
+        ax.set_xlabel('Professional ID')
         ax.set_ylabel('Average Rating')
-        ax.set_title('Customer Ratings Summary')
+        ax.set_title('Ratings Summary')
         ax.set_xticklabels(users, rotation=45, ha="right")
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))  # Ensure integer labels on y-axis
 
-        graph_path = os.path.join('static', 'charts', f'bar_graph_admin_{uniq}.png')
-        os.makedirs(os.path.dirname(graph_path), exist_ok=True)
-        fig.tight_layout()
-        fig.savefig(graph_path)
-        return graph_path
+        # Save the chart locally
+        chart_dir = os.path.join('static', 'charts')
+        os.makedirs(chart_dir, exist_ok=True)
+
+        chart_filename = f'bar_graph_admin_{uniq}.png'
+        chart_path = os.path.join(chart_dir, chart_filename)
+
+        fig.savefig(chart_path, format='png')
+
+        return url_for('routes.serve_chart', filename=chart_filename, _external=True)
+
     
     @staticmethod
     @cache.memoize(timeout=300)
     def generate_pie_chart_admin(request_status, request_counts, uniq):
+        request_counts = [int(c) if c is not None else 0 for c in request_counts]
+
+        # Prevent empty pie chart error
+        if sum(request_counts) == 0:
+            request_counts[0] = 1  # Ensure at least one segment exists
+
         fig, ax = plt.subplots()
-        ax.pie(request_counts, labels=request_status, autopct='%1.1f%%', startangle=90, colors=['#FF6347', '#4CAF50', '#FFD700', '#1E90FF'])
+        ax.pie(request_counts, labels=request_status, autopct='%1.1f%%', startangle=90,
+               colors=['#FF6347', '#4CAF50', '#FFD700', '#1E90FF'])
         ax.set_title('Service Request Status')
 
-        pie_chart_path = os.path.join('static', 'charts', f'pie_chart_admin_{uniq}.png')
-        os.makedirs(os.path.dirname(pie_chart_path), exist_ok=True)
-        fig.savefig(pie_chart_path)
-        return pie_chart_path
+        # Save the chart locally
+        chart_dir = os.path.join('static', 'charts')
+        os.makedirs(chart_dir, exist_ok=True)
+
+        chart_filename = f'pie_chart_admin_{uniq}.png'
+        chart_path = os.path.join(chart_dir, chart_filename)
+
+        fig.savefig(chart_path, format='png')
+
+        return url_for('routes.serve_chart', filename=chart_filename, _external=True)
 
 from application.jobs.tasks import export_closed_requests  # Import Celery task
 class AdminCSV(Resource):
     def get(self, professional_id):
-        # export_closed_requests.delay(professional_id)
-        export_closed_requests.apply_async(args=[professional_id])  # Correct async call
+        task = export_closed_requests.delay(professional_id)
+        return jsonify({'message': 'CSV export job started', 'task_id': task.id})
+
+        # export_closed_requests.apply_async(args=[professional_id])  # Correct async call
         # export_closed_requests.apply_async((None, professional_id))
 
-        return jsonify({'message': 'CSV export job started'})
+        # return jsonify({'message': 'CSV export job started'})ask_id': task.id})

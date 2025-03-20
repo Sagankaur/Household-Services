@@ -8,8 +8,47 @@ export default {
       loading: false,
     };
   },
+  // created() {
+  //   // Check if user is already logged in
+  //   const userId = localStorage.getItem('userId');
+  //   const role = localStorage.getItem('role');
+  //   const token = localStorage.getItem('authToken');
+
+  //   if (userId && role && token) {
+  //     this.$store.dispatch('login', { userId, role, authToken: token });
+  //     if (role.toLowerCase() === "admin") {
+  //       this.$router.push(`/home_admin/${userId}`);
+  //     }
+  //   }
+  // },
   methods: {
+    validateInput() {
+      if (!this.username.trim() || !this.password.trim()) {
+        this.errorMessage = "Username and password cannot be empty.";
+        return false;
+      }
+      if (this.username.length < 3) {
+        this.errorMessage = "Username must be at least 3 characters long.";
+        return false;
+      }
+      if (/\s/.test(this.username)) {
+        this.errorMessage = "Username cannot contain spaces.";
+        return false;
+      }
+      if (this.password.length < 6) {
+        this.errorMessage = "Password must be at least 6 characters long.";
+        return false;
+      }
+      if (!/[A-Z]/.test(this.password) || !/[0-9]/.test(this.password) || !/[\W_]/.test(this.password)) {
+        this.errorMessage = "Password must contain at least one uppercase letter, one number, and one special character.";
+        return false;
+      }
+      this.errorMessage = "";
+      return true;
+    },
     async login() {
+      // if (!this.validateInput()) return;
+
       this.loading = true;
       this.errorMessage = "";
   

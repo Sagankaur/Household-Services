@@ -7,6 +7,7 @@ export default {
         return {
             showRequestModal: false,
             selectedRequest: {},
+            selectedSearchType: '',
             Requests: [],
             userId: null,
             search: {
@@ -39,19 +40,16 @@ export default {
                 const token = this.$store.getters.authToken; // Use Vuex state
                 let params = {};
                 
-                // if (this.search.date) {
-                //     params.search_type = 'date';
-                //     params.value = this.search.date;
-                // } else if (this.search.address) {
-                //     params.search_type = 'address';
-                //     params.value = this.search.address;
-                // } else if (this.search.pincode) {
-                //     params.search_type = 'pincode';
-                //     params.value = this.search.pincode;
-                // }
-                if (this.search.date) params.date = this.search.date;
-                if (this.search.address) params.address = this.search.address;
-                if (this.search.pincode) params.pincode = this.search.pincode;
+                if (this.search.date) {
+                    params.search_type = "date";
+                    params.value = this.search.date; // Use day and year directly here
+                } else if (this.search.address) {
+                    params.search_type = "address";
+                    params.value = this.search.address;
+                } else if (this.search.pincode) {
+                    params.search_type = "pincode";
+                    params.value = this.search.pincode;
+                } 
 
                 const response = await axios.get(`http://localhost:5000/search_professional/${this.userId}`, {
                     params: params,
@@ -59,9 +57,9 @@ export default {
                         Authorization: `Bearer ${token}`
                     }
                 });
-                this.Requests = response.data.requests || [];
-                console.log("Requests", this.Requests)
-
+                this.Requests = response.data.requests || []; // like this[0:{},1:{}}]
+                console.log("Requests recived from search_prof", this.Requests)
+                console.log("params",params)
                 if (this.Requests.length === 0) {
                     this.error = "No matching service requests found.";
                 }
@@ -93,18 +91,34 @@ export default {
     <div id="app" class="container mt-5">
         <h2>Search Service Requests</h2>
         <form @submit.prevent="searchRequests">
-            <div class="row">
-                <div class="col-md-4">
-                    <input type="date" v-model="search.date" class="form-control" placeholder="Search by Date">
-                </div>
-                <div class="col-md-4">
-                    <input type="text" v-model="search.address" class="form-control" placeholder="Search by Address">
-                </div>
-                <div class="col-md-4">
-                    <input type="text" v-model="search.pincode" class="form-control" placeholder="Search by Pincode">
-                </div>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <select v-model="selectedSearchType" class="form-select">
+                    <option value="">Select Search Type</option>
+                    <option value="date">Search by Date</option>
+                    <option value="address">Search by Address</option>
+                    <option value="pincode">Search by Pincode</option>
+                </select>
             </div>
-            <button type="submit" class="btn btn-primary mt-3">Search</button>
+            <div class="col-md-8">
+                <input v-if="selectedSearchType === 'date'" 
+                       type="date" 
+                       v-model="search.date" 
+                       class="form-control" 
+                       placeholder="Select Date">
+                <input v-if="selectedSearchType === 'address'" 
+                       type="text" 
+                       v-model="search.address" 
+                       class="form-control" 
+                       placeholder="Enter Address">
+                <input v-if="selectedSearchType === 'pincode'" 
+                       type="text" 
+                       v-model="search.pincode" 
+                       class="form-control" 
+                       placeholder="Enter Pincode">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Search</button>
         </form>
         
         <!-- Modal for Viewing Service Request Details --> 

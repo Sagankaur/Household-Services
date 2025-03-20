@@ -29,7 +29,8 @@ export default {
                     'Authorization': `Bearer ${token}`
                 },
             });
-          this.bar_graph_path_customer = response.data.bar_graph_path_customer;
+          console.log("Full sumry:", response.data);
+          this.bar_graph_path_customer = response.data.bar_graph_path;
           console.log("bar_graph_path_customer:", this.bar_graph_path_customer);
         
         } catch (error) {

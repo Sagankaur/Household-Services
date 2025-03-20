@@ -133,7 +133,7 @@ class Professional(db.Model):
     status = db.Column(db.String(100), default='pending') #approved/blocked
     
     ratings = db.Column(db.Float, nullable=True) #avg
-    review = db.Column(db.String, nullable=True)
+    review = db.Column(db.String, nullable=True) 
     total_reviews = db.Column(db.Integer, default=0)
 
     # One-to-Many relationship with ServiceRequest
@@ -144,19 +144,28 @@ class Professional(db.Model):
     @property
     def all_ratings(self):
         # Collect all ratings given to the professional
-        return [sr.rating for sr in self.service_requests if sr.rating is not None]
-
+        return [
+        sr.rating for sr in 
+        ServiceRequest.query.filter_by(professional_id=self.id).filter(
+        ServiceRequest.rating != None  # Exclude None ratings
+        ).all()]
+    
     def update_ratings_and_reviews(self):
-        completed_requests = [sr for sr in self.service_requests if sr.rating is not None]
-        
+        completed_requests = ServiceRequest.query.filter_by(professional_id=self.id, service_status='closed').filter(
+            ServiceRequest.rating != None  # Exclude None ratings
+        ).all()
+
         if completed_requests:
             total_rating = sum(sr.rating for sr in completed_requests)
             self.ratings = total_rating / len(completed_requests)
             self.total_reviews = len(completed_requests)
 
-            # Aggregate reviews (limit to last 5)
-            recent_reviews = sorted(completed_requests, key=lambda x: x.date_of_completion or datetime.min, reverse=True)[:5]
-            self.review = " | ".join(f"{sr.review}" for sr in recent_reviews if sr.review)
+            recent_reviews = sorted(
+                completed_requests,
+                key=lambda x: x.date_of_completion or datetime.min,
+                reverse=True
+            )[:5]
+            self.review = " | ".join(f"{sr.review[:100]}" for sr in recent_reviews if sr.review)
         else:
             self.ratings = 0.0
             self.total_reviews = 0
@@ -215,7 +224,7 @@ class ServiceRequest(db.Model):
     date_of_request = db.Column(db.DateTime, default=datetime.utcnow)
     date_of_completion = db.Column(db.DateTime, nullable=True)
     remarks = db.Column(db.String, nullable=True)
-    service_status = db.Column(db.String(50), default='pending')  # pending/completed/accepted/rejected
+    service_status = db.Column(db.String(50), default='pending')  # pending/closed/accepted/rejected
     review = db.Column(db.String, nullable=True)  # connect to professional
     rating = db.Column(db.Float, nullable=True)  # connect to professional => list of all the ratings
     #1 service re has 1 rating 

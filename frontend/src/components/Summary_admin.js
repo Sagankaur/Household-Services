@@ -31,6 +31,8 @@ export default {
                 },
             });
           // Store the chart image path
+          console.log("Full sumry:", response.data);
+
           this.bar_graph_path_admin = response.data.bar_graph_path_admin;
           this.pie_chart_path_admin = response.data.pie_chart_path_admin;
   

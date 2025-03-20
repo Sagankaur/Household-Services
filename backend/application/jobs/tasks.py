@@ -1,40 +1,35 @@
 import csv
 import os
-
-#import flask_excel
+from flask import current_app
+from application.jobs.email import mail 
 
 from celery import shared_task
-from celery import Celery
-from flask_mail import Message
 from datetime import datetime
 from flask import render_template
+from sqlalchemy import and_
 
 from application.data.model import *
-from application.jobs.email import *
 
-@shared_task(ignore_result = True)
+@shared_task(ignore_result=True)
 def send_daily_reminder():
     """Send daily reminder to professionals with pending service requests."""
     
     professionals = Professional.query.all()
 
     for professional in professionals:
-        if professional.service_requests.service_status == "pending":
-        # Prepare reminder message
-            reminder_message = "Reminder: You have pending service requests. Please visit or take action."
+        pending_requests = [req for req in professional.service_requests if req.service_status == "pending"]
+        if pending_requests and professional.user.email:
+            mail(
+                to=professional.user.email,
+                subject="Daily Reminder",
+                content="Reminder: You have pending service requests."
+            )
 
-            # Send email as a fallback
-            if professional.user.email:
-                msg = Message(
-                    'Daily Reminder',
-                    sender='your-email@gmail.com',
-                    recipients=[professional.user.email]
-                )
-                msg.body = reminder_message
-                mail.send(msg)
-@shared_task(ignore_result = True)
+@shared_task(ignore_result=True)
 def send_monthly_reports():
-    first_of_month = datetime(datetime.now().year, datetime.now().month, 1)
+    """Generate and send monthly reports to customers with their service request details."""
+    
+    first_of_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     customers = Customer.query.all()
 
     for customer in customers:
@@ -44,57 +39,51 @@ def send_monthly_reports():
         ).all()
 
         if not service_requests:
-            continue
+            continue  # Skip if no requests
+
+        services_data = [service.to_dict() for service in service_requests]
 
         rendered_report = render_template(
             'monthly_report.html',
-            customer=customer,
-            services=service_requests
+            customer=customer.user.to_dict(),
+            services=services_data
         )
 
-        send_email(
+        mail(
+            to=customer.user.email,
             subject="Your Monthly Activity Report",
-            recipients=[customer.user.email],
-            body="Please find your activity report attached.",
-            html=rendered_report
+            content=rendered_report
         )
 
-@shared_task(ignore_result = False) # Remove bind=True
-def export_closed_requests(professional_id): #admin trigerred
-    service_requests = ServiceRequest.query.filter_by(
-        professional_id=professional_id,
-        service_status='closed'
-    ).all()
+@shared_task(ignore_result=False)
+def export_closed_requests(professional_id):
+    with current_app.app_context():  
+        service_requests = ServiceRequest.query.filter_by(
+            professional_id=professional_id,
+            service_status='closed'
+        ).all()
 
-    if not service_requests:
-        return None
+        if not service_requests:
+            return None
 
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    file_path = os.path.join('celery', 'User_downloads', f'service_requests_{professional_id}_{timestamp}.csv')
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        file_path = os.path.join("application", "jobs", "User_downloads", f"service_requests_{professional_id}.csv")
+        
+        if not os.path.exists(os.path.dirname(file_path)):
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
 
-    with open(file_path, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(['Service ID', 'Customer ID', 'Professional ID', 'Date of Request', 'Review'])
-        for request in service_requests:
-            writer.writerow([request.id, request.customer_id, request.professional_id, request.date_of_request, request.review])
+        print(file_path)
+        
+        with open(file_path, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Service ID', 'Customer ID', 'Professional ID', 'Date of Request', 'Review'])
+            for request in service_requests:
+                writer.writerow([request.id, request.customer_id, request.professional_id, request.date_of_request, request.review])
 
-    send_email(
-        subject="CSV Export Completed",
-        recipients=['admin@example.com'],
-        body=f"The CSV export for professional {professional_id} is complete. Download it here: {file_path}"
-    )
-    return file_path
+        mail(
+            to= professional.user.email,
+            subject="CSV Export Completed",
+            content=f"The CSV export for professional {professional_id} is complete. Download it here: {file_path}"
+        )
+        return file_path
 
-@shared_task(ignore_result=True)
-def cleanup_old_charts():
-    chart_dir = "static/charts"
-    if not os.path.exists(chart_dir):
-        return
-    
-    current_time = datetime.now()
-    for filename in os.listdir(chart_dir):
-        file_path = os.path.join(chart_dir, filename)
-        file_modified = datetime.fromtimestamp(os.path.getmtime(file_path))
-        if (current_time - file_modified).days > 1:
-            os.remove(file_path)

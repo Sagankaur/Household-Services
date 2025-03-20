@@ -93,32 +93,48 @@ class ServiceRequestAction(Resource):
         db.session.commit()
 
         return {"message": f"Request {action}ed successfully"}
-
+        
 class ProfessionalSearch(Resource):
     @jwt_required()
     def get(self, user_id):
         search_type = request.args.get("search_type")
         search_value = request.args.get("value")
 
-        user = User.query.get_or_404(user_id)        
+        # Validate user role
+        user = User.query.get_or_404(user_id)
         if user.roles[0].name.lower() != "professional":
             return {"message": "Access denied. Professionals only."}
 
         # Base query: Filter by professional_id
         query = ServiceRequest.query.filter(ServiceRequest.professional_id == user_id)
 
-        # Apply filters dynamically
-        if search_type and search_value:
-            if search_type == "date":
-                query = query.filter(ServiceRequest.date_of_request == search_value)
-            elif search_type == "address":
-                query = query.join(ServiceRequest.customer).join(Customer.user).filter(User.address.ilike(f"%{search_value}%"))
-            elif search_type == "pincode":
-                query = query.join(ServiceRequest.customer).join(Customer.user).filter(User.pincode == search_value)
-            else:
-                return jsonify({"error": "Invalid search type"})
+        # Apply filters dynamically based on search_type
+        if search_type == "date":
+            try:
+                # Convert the input date string to a datetime object
+                search_date = datetime.strptime(search_value, "%Y-%m-%d")  # Expecting 'YYYY-MM-DD'
+                # Create a range for the entire day
+                start_of_day = search_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                end_of_day = start_of_day + timedelta(days=1) - timedelta(microseconds=1)
+                # Filter requests within this day
+                query = query.filter(ServiceRequest.date_of_request.between(start_of_day, end_of_day))
+            except ValueError:
+                return jsonify({"error": "Invalid date format. Use 'YYYY-MM-DD' (e.g., '2024-03-08')."})
+        
+        elif search_type == "address":
+            query = query.join(ServiceRequest.customer).join(Customer.user).filter(
+                User.address.ilike(f"%{search_value}%")
+            )
+        
+        elif search_type == "pincode":
+            query = query.join(ServiceRequest.customer).join(Customer.user).filter(
+                User.pincode == search_value
+            )
+        
+        else:
+            return jsonify({"error": "Invalid search type. Valid options are 'date', 'address', or 'pincode'."})
 
-        # Execute the query
+        # Execute the query and fetch results
         results = query.options(joinedload(ServiceRequest.customer).joinedload(Customer.user)).all()
 
         # Handle empty results
@@ -131,15 +147,27 @@ class ProfessionalSearch(Resource):
 
         # Return serialized data
         return jsonify({
+            "status": "success",
+            "message": f"{len(results)} service request(s) found.",
             "requests": [sr.to_dict() for sr in results]
         })
+
 # {"requests": [{},{}..]}
 
+
 class ProfessionalSummary(Resource):
-    # method_decorators = [professional_required]
     @jwt_required()
-    @cache.memoize(timeout=300)
+    # @cache.memoize(timeout=300)
     def get(self, user_id):
+
+        logging.info(f"Fetching ProfessionalSummary for user_id: {user_id}")
+        
+        cache_key = f"professional_summary_{user_id}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logging.info(f"Cache HIT for {user_id}")
+            return cached_data 
+        logging.info(f"Cache MISS for {user_id}")
 
         professional = Professional.query.get(user_id)
         user = User.query.get(user_id)        
@@ -169,23 +197,27 @@ class ProfessionalSummary(Resource):
 
         # Get service request statuses
         statuses = db.session.query(ServiceRequest.service_status).filter_by(professional_id=professional.id).all()
-        status_counts = {"pending": 0, "completed": 0, "rejected": 0, "accepted": 0}
+        status_counts = {"pending": 0, "closed": 0, "rejected": 0, "accepted": 0}
         for status in statuses:
             if status[0] in status_counts:
                 status_counts[status[0]] += 1
 
-        return {
-            "pie_chart_prof": str(self.generate_pie_chart_prof(rating_counts,uniq)),
-            "bar_chart_prof": str(self.generate_bar_chart_prof(status_counts,uniq)),
+        response_data = {
+            "pie_chart_prof": self.generate_pie_chart_prof(rating_counts, uniq),
+            "bar_chart_prof": self.generate_bar_chart_prof({"pending": 2, "closed": 3, "rejected": 1, "accepted": 4}, uniq),
             "average_rating": average_rating,
         }
+        cache.set(cache_key, response_data, timeout=300)
+
+        return response_data
     
     @staticmethod
     @cache.memoize(timeout=300)  # Cache for 5 minutes
-    def generate_pie_chart_prof(rating_counts,uniq):  
+    def generate_pie_chart_prof(rating_counts, uniq):  
+        """Generate a pie chart for professional ratings distribution."""
         labels = ["1 Star", "2 Stars", "3 Stars", "4 Stars", "5 Stars"]
         colors = ["#FF9999", "#FFCC99", "#FFFF99", "#99FF99", "#66B2FF"]
-        
+
         # Convert values to float and replace NaN with 0
         rating_counts = [float(r) if (r is not None and not np.isnan(r)) else 0 for r in rating_counts]
 
@@ -197,17 +229,21 @@ class ProfessionalSummary(Resource):
         ax.pie(rating_counts, labels=labels, colors=colors, autopct="%1.1f%%", startangle=90)
         ax.set_title("Ratings Distribution")
 
-        # path = f"static/charts/pie_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-        # path = os.path.join("backend", "static", "charts", f"pie_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png")
-        path = f"static/charts/pie_chart_prof_{uniq}.png"
+        # Save the chart locally
+        chart_dir = os.path.join('static', 'charts')
+        os.makedirs(chart_dir, exist_ok=True)
 
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        fig.savefig(path)
+        chart_filename = f'pie_chart_prof_{uniq}.png'
+        chart_path = os.path.join(chart_dir, chart_filename)
 
-        return path
+        fig.savefig(chart_path, format='png')
+
+        return url_for('routes.serve_chart', filename=chart_filename, _external=True)
+
     @staticmethod
     @cache.memoize(timeout=300)  # Cache for 5 minutes
     def generate_bar_chart_prof(status_counts, uniq):
+        """Generate a bar chart for service request status."""
         labels, values = zip(*status_counts.items())
         colors = ["#66B2FF", "#99FF99", "#FF9999"]
 
@@ -216,16 +252,18 @@ class ProfessionalSummary(Resource):
         ax.set_xlabel("Status")
         ax.set_ylabel("Number of Requests")
         ax.set_title("Service Request Status")
+        ax.yaxis.set_major_locator(mticker.MaxNLocator(integer=True))  # Force integer y-axis labels
 
-        # path = os.path.join("backend", "static", "charts", f"bar_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png")
-        # path = f"static/charts/bar_chart_prof_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-        path = f"static/charts/bar_chart_prof_{uniq}.png"
-        
-        if not os.path.exists(path):
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            fig.savefig(path)
-        
-        return path
+        # Save the chart locally
+        chart_dir = os.path.join('static', 'charts')
+        os.makedirs(chart_dir, exist_ok=True)
+
+        chart_filename = f'bar_chart_prof_{uniq}.png'
+        chart_path = os.path.join(chart_dir, chart_filename)
+
+        fig.savefig(chart_path, format='png')
+
+        return url_for('routes.serve_chart', filename=chart_filename, _external=True)
 
     @staticmethod
     def clear_cache(user_id):

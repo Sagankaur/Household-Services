@@ -1,5 +1,4 @@
-//http://localhost:8080/summary_professional/static/charts/bar_chart_prof_20250308012311.png
-        
+// http://localhost:5000/static/charts/bar_chart_prof_d1426de6d42f4e88b99911d8c89391af.png        
 import axios from 'axios';
 export default {
     name: 'SummaryProfessional',
@@ -25,22 +24,19 @@ export default {
     },
   
     methods: {
-      async fetchChartData() { //http://localhost:8080/summary_professional/static/charts/bar_chart_prof_20250308012311.png
+      async fetchChartData() { 
         try {
           const token = this.$store.getters.authToken;
           const response = await axios.get(`http://localhost:5000/summary_professional/${this.userId}`, { 
             headers: { Authorization: `Bearer ${token}` }
           });
         
-          console.log("before", response.data.bar_chart_prof);
-          // before static/charts/bar_chart_prof_20250308012311.png
-          // this.bar_chart_prof = response.data.bar_chart_prof;
-          // this.pie_chart_prof = response.data.pie_chart_prof;
+          console.log("Full sumry:", response.data);
+
+          this.bar_chart_prof = response.data.bar_chart_prof;
+          this.pie_chart_prof = response.data.pie_chart_prof;
           this.avg_rate= response.data.average_rating;
 
-          this.bar_chart_prof = `http://localhost:5000${response.data.bar_chart_prof}`;
-          this.pie_chart_prof = `http://localhost:5000${response.data.pie_chart_prof}`;
-          // after static/charts/bar_chart_prof_20250308012311.png
           console.log("after", this.bar_chart_prof);
 
         } catch (error) {
@@ -53,7 +49,7 @@ export default {
     <div id="app" class="container mt-5">
         <h2>Professional Summary</h2>
       <div class="star">
-        <h3>Average Ratings: {{ avg_rate.toFixed(2) }} Stars </h3>
+        <h3>Average Ratings: {{ avg_rate.toFixed(2) }} ⭐ </h3>
       </div>
 
       <div class ='bar_chart'>

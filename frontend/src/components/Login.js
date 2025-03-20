@@ -9,7 +9,32 @@ export default {
     };
   },
   methods: {
+    validateInput() {
+      if (!this.username.trim() || !this.password.trim()) {
+        this.errorMessage = "Username and password cannot be empty.";
+        return false;
+      }
+      if (this.username.length < 3) {
+        this.errorMessage = "Username must be at least 3 characters long.";
+        return false;
+      }
+      if (/\s/.test(this.username)) {
+        this.errorMessage = "Username cannot contain spaces.";
+        return false;
+      }
+      if (this.password.length < 6) {
+        this.errorMessage = "Password must be at least 6 characters long.";
+        return false;
+      }
+      if (!/[A-Z]/.test(this.password) || !/[0-9]/.test(this.password) || !/[\W_]/.test(this.password)) {
+        this.errorMessage = "Password must contain at least one uppercase letter, one number, and one special character.";
+        return false;
+      }
+      this.errorMessage = "";
+      return true;
+    },
     async login() {
+      // if (!this.validateInput()) return;
       this.loading = true;
       this.errorMessage = "";
     

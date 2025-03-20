@@ -9,7 +9,7 @@ const routes = [
   { path: '/login', component: components.Login },
   { path: '/adminlogin', component: components.AdminLogin },
   { path: '/register', component: components.Register },
-  { path: '/logout', redirect: '/login' },
+  // { path: '/logout', redirect: '/login' },
 
   // Admin Routes
   { path: '/home_admin/:user_id', component: components.HomeAdmin, meta: { requiresAuth: true, role: 'Admin' } },
@@ -56,19 +56,35 @@ const router = createRouter({
 });
 
 // Navigation Guards
+// router.beforeEach((to, from, next) => {
+//   // const isLoggedIn = store.getters.isLoggedIn
+//   const isAuth = store.getters.isAuth
+//   const userRole = store.getters.userRole
+
+//   if (to.meta.requiresAuth && !isAuth) {
+//     next('/login');
+//   } else if (to.meta.requiresAuth && to.meta.role !== userRole) {
+//     next('/') // Redirect to home or unauthorized page
+//   } else if (isAuth && (to.path === '/login' || to.path === '/register' || to.path === '/adminlogin')) {
+//     next(`/home_${userRole.toLowerCase()}/${store.getters.userId}`)
+//   } else {
+//     next()
+//   }
+// })
 router.beforeEach((to, from, next) => {
-  // const isLoggedIn = store.getters.isLoggedIn
-  const isAuth = store.getters.isAuth
-  const userRole = store.getters.userRole
+  const isAuth = store.getters.isAuth || !!localStorage.getItem('authToken'); // Check Vuex and localStorage
+  const userRole = store.getters.userRole || localStorage.getItem('role');
+  const userId = store.getters.userId || localStorage.getItem('userId');
 
   if (to.meta.requiresAuth && !isAuth) {
     next('/login');
   } else if (to.meta.requiresAuth && to.meta.role !== userRole) {
-    next('/') // Redirect to home or unauthorized page
-  } else if (isAuth && (to.path === '/login' || to.path === '/register' || to.path === '/adminlogin')) {
-    next(`/home_${userRole.toLowerCase()}/${store.getters.userId}`)
+    next('/'); // Redirect to home or unauthorized page
+  } else if (isAuth && ['/login', '/register', '/adminlogin'].includes(to.path)) {
+    next(`/home_${userRole.toLowerCase()}/${userId}`);
   } else {
-    next()
+    next();
   }
-})
+});
+
 export default router;
