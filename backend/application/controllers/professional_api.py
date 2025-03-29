@@ -16,7 +16,7 @@ class ProfessionalHome(Resource):
         requests = {
             "pending": "pending",
             "accepted": "accepted",
-            "completed": "completed",
+            "closed": "closed",
         }
         
         response_data = {
@@ -67,7 +67,7 @@ class ProfessionalHome(Resource):
             db.session.rollback()
             return jsonify({"status": "error", "message": str(e)})
 # { "accepted_requests": [{},{}..],
-#   "completed_requests": [],
+#   "closed_requests": [], closed_requests
 #   "pending_requests": [],
 #   "professional": {},
 #   "user": {}}
@@ -80,8 +80,8 @@ class ServiceRequestAction(Resource):
         if user.roles[0].name.lower() != "professional":
             return {"message": "Access denied. Professionals only."}
 
-        if action not in ["accept", "reject"]:
-            return {"error": "Invalid action"}, 400
+        if action not in ["accept", "reject",'close']:
+            return {"error": "Invalid action"}
 
         # Fetch the service request and check if it belongs to the current user
         service_request = ServiceRequest.query.filter_by(id=request_id, professional_id=user_id).first_or_404()
@@ -90,6 +90,13 @@ class ServiceRequestAction(Resource):
             service_request.service_status = "accepted"
         elif action == "reject":
             service_request.service_status = "rejected"
+        elif action == "close":
+            if  service_request.service_status == "accepted":
+                service_request.service_status = "closed"
+                service_request.date_of_completion = datetime.now()
+            else:
+                return {"message": "Request is not approved yet."}
+        
         db.session.commit()
 
         return {"message": f"Request {action}ed successfully"}

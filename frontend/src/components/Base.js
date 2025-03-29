@@ -134,7 +134,7 @@ export default {
       this.$router.push('/login');
     },
     redirectToHome() {
-      if (this.userId && this.userRole) {
+      if (this.userId && this.userRole && typeof this.userId === "number") {
         const roleRoutes = {
           'Admin': `/home_admin/${this.userId}`,
           'Customer': `/home_customer/${this.userId}`,

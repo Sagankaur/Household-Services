@@ -1,6 +1,7 @@
 from application.controllers.api import *
+from sqlalchemy.orm import joinedload
+from sqlalchemy.sql import func
 
-# Admin Home
 class AdminHome(Resource):
     @jwt_required()
     def get(self, user_id):
@@ -10,27 +11,52 @@ class AdminHome(Resource):
 
         services = [ser.to_dict() for ser in Service.query.all()]
         pending_professionals = [
-            {**pp.user.to_dict(), **pp.to_dict()}  # Merge user and professional info
+            {**pp.user.to_dict(), **pp.to_dict()}  
             for pp in Professional.query.filter_by(status='pending').all()
-            ]
-        # pending_professionals = Professional.query.filter_by(status='pending').all()
+        ]
+        pending_customers = [
+            {**pc.user.to_dict(), **pc.to_dict()}  
+            for pc in Customer.query.filter_by(status='pending').all()
+        ]
         low_rated_professionals = [
-            {**lp.user.to_dict(), **lp.to_dict()}  # Merge user and professional details
+            {**lp.user.to_dict(), **lp.to_dict()}  
             for lp in Professional.query.filter(
-                (Professional.ratings < 2) & (Professional.total_reviews > 3)
+                (Professional.ratings < 2) & (Professional.total_reviews > 1) #to_rev>5
             ).all()
         ]
-
+        low_rated_customers = [
+            {**lc.user.to_dict(), **lc.to_dict()}  
+            for lc in Customer.query
+                .join(ServiceRequest)
+                .filter(ServiceRequest.service_status == "pending") 
+                .group_by(Customer.id)
+                .having(func.count(ServiceRequest.id) > 1)  #make it 5
+                .options(joinedload(Customer.user))  
+                .all()
+        ]
         pending_requests = [sr.to_dict() for sr in ServiceRequest.query.filter_by(service_status='pending').all()]
-        admin = User.query.filter_by(id=user_id).first()
-        admin = admin.to_dict()
+        blocked_professional = [
+            {**bp.user.to_dict(), **bp.to_dict()}  
+            for bp in Professional.query.filter_by(status='blocked').all()
+        ]
+        blocked_customer = [
+            {**bc.user.to_dict(), **bc.to_dict()}  
+            for bc in Customer.query.filter_by(status='blocked').all()
+        ]
+        admin = user.to_dict()
+
         return jsonify({
             'services': services,
             'pending_professionals': pending_professionals,
+            'pending_customers': pending_customers,
             'low_rated_professionals': low_rated_professionals,
             'pending_requests': pending_requests,
+            'low_rated_customers': low_rated_customers,
+            'blocked_professional': blocked_professional,
+            "blocked_customer":blocked_customer,
             'admin': admin
         })
+
 # {"low_rated_professionals": [{},],"pending_professionals": [{},{}..],
 # "pending_requests": [{},{}..],"services": [{},{}..]}
 
@@ -102,6 +128,27 @@ class ActionProf(Resource):
             db.session.delete(professional)
         elif action == "block":
             professional.status = "blocked"
+
+        else:
+            return jsonify({'error': 'Invalid action'})
+
+        db.session.commit()
+        return jsonify({'message': f'Action {action} performed on professional {id}'})
+
+
+# Action on Customer (approve, reject, block)
+class ActionCust(Resource):
+    def put(self, id, action):
+        customer = Customer.query.get(id)
+        if not customer:
+            return jsonify({'error': 'Customer not found'})
+
+        if action == "approve":
+            customer.status = 'approved'
+        elif action == "reject":
+            db.session.delete(customer)
+        elif action == "block":
+            customer.status = "blocked"
         else:
             return jsonify({'error': 'Invalid action'})
 
@@ -113,10 +160,64 @@ class RequestView(Resource):
     def get(self, id):
         service_request = ServiceRequest.query.get(id)
         if not service_request:
-            return jsonify({'message': 'Service request not found'}), 404
+            return jsonify({'message': 'Service request not found'})
         
         return jsonify(service_request.to_dict())  # Ensure JSON response
+    
+    def put(self, id):
+        """ Update service request details """
+        service_request = ServiceRequest.query.get(id)
+        print(service_request.to_dict()) 
+        # {'id': 2, 'customer_username': 'cust', 'customer_name': 'cust1', 'c_address': '123 Cust Street', 'c_pincode': '122222', 'c_phone': '5666690', 'professional_username': 'prof', 'professional_name': 'prof', 'p_phone': '0123456789', 'service': 'Test Service', 'date_of_request': '2025-03-04', 'remarks': None, 'service_status': 'accepted', 'date_of_completion': '2025-03-06', 'review': 'Great service!', 'rating': 4.5}
+        if not service_request:
+            return jsonify({'message': 'Service request not found'})
+        if not request.json:
+            return jsonify({"error": "Empty request body"})
+        print(request.json)
+        # {'c_address': '123 Cust new', 'c_pincode': '122222', 'c_phone': '5666690', 'date_of_request': '2025-03-27'}
 
+        try:
+            data = request.json
+            if "c_address" in data: 
+                service_request.customer.user.address = data["c_address"]
+            if "c_pincode" in data:
+                service_request.customer.user.pincode = data["c_pincode"]
+            if "c_phone" in data:
+                service_request.customer.user.phone_number = data["c_phone"]
+            
+            if "date_of_request" in data:
+                # service_request.date_of_request = data["date_of_request"]
+                service_request.date_of_request = datetime.strptime(data["date_of_request"], "%Y-%m-%d")
+            if "review" in data:
+                service_request.review = data["review"]
+            if "rating" in data:
+                service_request.rating = data["rating"]
+            if "remarks" in data:
+                service_request.remarks = data["remarks"]
+                
+            db.session.commit()
+            professional = Professional.query.get(service_request.professional_id)
+            
+            if (professional) and (service_request.service_status=="closed") :
+                if "rating" in data:
+                    current_rating = data["rating"] 
+                    total_reviews = professional.total_reviews
+                    professional.ratings = ((current_rating * total_reviews) + current_rating) / total_reviews
+                if "review" in data:
+                    professional.update_ratings_and_reviews()
+                db.session.commit()  # Save changes
+            else:
+                return ({'message': 'Can not Update service request',
+                        "error": "Not allowed"})
+            
+            return jsonify({'message': 'Service request updated successfully', 
+                            'request': service_request.to_dict()
+                        })
+        
+        except Exception as e:
+            db.session.rollback()  # Rollback in case of error
+            return jsonify({'message': 'Failed to update request', 'error': str(e)})
+    
 # Delete Service Request
 class AdminRequestDelete(Resource):
     def delete(self, request_id):
@@ -127,6 +228,23 @@ class AdminRequestDelete(Resource):
         db.session.delete(service_request)
         db.session.commit()
         return jsonify({'message': 'Service request deleted successfully'})
+
+class AdminServiceDelete(Resource):
+    def delete(self, service_id):
+        service = Service.query.get(service_id)
+        if not service:
+            return jsonify({'message': 'Service request not found'})
+
+        professionals = Professional.query.filter_by(service_id=service_id).all()
+        none_service = Service.query.filter_by(name="Test Service").first()
+        none_service_id = none_service.id if none_service else 0  
+
+        for professional in professionals:
+            professional.service_id = none_service_id
+
+        db.session.delete(service)
+        db.session.commit()
+        return jsonify({'message': 'Service deleted successfully'})
 
 class AdminSearch(Resource):
     @jwt_required()
@@ -243,7 +361,7 @@ class AdminSummary(Resource):
             'bar_graph_path_admin': bar_graph_path_admin,
             'pie_chart_path_admin': pie_chart_path_admin
         }
-        cache.set(cache_key, response_data, timeout=300)
+        cache.set(cache_key, response_data, timeout=300) #5 minutes or 300 seconds
         return jsonify(response_data)
 
     @staticmethod
@@ -298,12 +416,14 @@ class AdminSummary(Resource):
         return url_for('routes.serve_chart', filename=chart_filename, _external=True)
 
 from application.jobs.tasks import export_closed_requests  # Import Celery task
+from celery.exceptions import OperationalError
+
 class AdminCSV(Resource):
     def get(self, professional_id):
-        task = export_closed_requests.delay(professional_id)
-        return jsonify({'message': 'CSV export job started', 'task_id': task.id})
-
-        # export_closed_requests.apply_async(args=[professional_id])  # Correct async call
-        # export_closed_requests.apply_async((None, professional_id))
-
-        # return jsonify({'message': 'CSV export job started'})ask_id': task.id})
+        try:
+            task = export_closed_requests.delay(professional_id)
+            return jsonify({'message': 'CSV export job started', 'task_id': task.id})
+        except OperationalError as e:
+            return jsonify({'error': 'Celery operational error', 'details': str(e)})
+        except Exception as e:
+            return jsonify({'error': 'Unexpected error', 'details': str(e)})

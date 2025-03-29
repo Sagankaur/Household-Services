@@ -117,11 +117,18 @@ class Customer(db.Model):
     id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True, unique=True) #if role is Customer than automatically update here
     service_requests = db.relationship('ServiceRequest', back_populates='customer') #1 customer=> many service reequests, one to many
     user = db.relationship('User', back_populates='customer')
+    status = db.Column(db.String(10), default='pending')
 
     # user = db.relationship('User', back_populates='customer', uselist=False) #no need coz using backref
 
     def __repr__(self):
         return f'<Customer {self.user.username}>'
+        
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "status": self.status
+            }
 
 
 class Professional(db.Model):

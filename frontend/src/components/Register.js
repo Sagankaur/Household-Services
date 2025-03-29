@@ -85,10 +85,10 @@ export default {
         });
     },
     submitForm() {
-      if (!this.validateInput()) {
-        console.log("Validation failed:", this.errors);
-        return; // ✅ Stop submission if validation fails
-      }
+      // if (!this.validateInput()) {
+      //   console.log("Validation failed:", this.errors);
+      //   return; // ✅ Stop submission if validation fails
+      // }
       axios
         .post('http://localhost:5000/register', this.formData)
         .then(response => {

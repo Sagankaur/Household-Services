@@ -43,12 +43,16 @@ def commonlogin():
         password = data.get('password')
 
         if not username or not password:
-            return jsonify({"error": "Missing username or password"}), 400
+            return jsonify({"error": "Missing username or password"})
 
         # Query the database for the user
         user = User.query.filter_by(username=username).first()
+        password_check = check_password_hash(user.password, password) if user else False
+        if not user or not password_check:
+            return jsonify({"error": "Invalid username or password"})
+
         if not user:
-            return jsonify({"error": "User not found"}), 404
+            return jsonify({"error": "User not found"})
         
         # Debugging prints
         print(f"Check password result: {check_password_hash(user.password, password)}")
@@ -59,7 +63,15 @@ def commonlogin():
             role = "No Role Assigned"
 
         if role == 'Admin':
-            return jsonify({"error": "Access Denied. Admins cannot log in here."}), 403
+            return jsonify({"error": "Access Denied. Admins cannot log in here."}),403
+
+        if role == 'Customer':
+           if user.customer.status == "blocked":
+                return jsonify({"error": f"Can't login right now. Customer {user.customer.status}"}),403
+        
+        if role == 'Professional':
+            if user.professional.status!="approved":
+                return jsonify({"error": f"Can't login right now. Professional {user.professional.status}"}),403
 
         if check_password_hash(user.password, password):
             # token = user.generate_auth_token()   # Assume this method exists on your user model
@@ -87,16 +99,17 @@ def commonregister():
         pincode = data.get('pincode')
         role_name = data.get('role')
 
+        if User.query.filter_by(username=username).first():
+            return jsonify({"success": False, "message": "User with this username already exists."}), 400
+        if User.query.filter_by(email=email).first():  # Check email uniqueness
+            return jsonify({"success": False, "message": "User with this email already exists."}), 400
         # def hash_password(password):
         #     return generate_password_hash(password, method="pbkdf2:sha256", salt_length=8)
 
         # Hash the password using Flask-Security
         hashed_password = hash_password(password)
 
-        # Check if the username or email already exists
-        if User.query.filter_by(username=username).first():
-            return jsonify({"success": False, "message": "User with this username already exists."}), 400
-        
+    
         role = Role.query.filter_by(name=role_name).first()
         
         user = datastore.create_user(name=name,username=username, email=email, password=hashed_password,
@@ -191,8 +204,25 @@ def adminlogin():
         print(f"Login error: {str(e)}")  # Log the error
         return jsonify({"error": "An unexpected error occurred"}), 500
 
+import os
+from pathlib import Path
 from flask import send_from_directory
 
 @routes.route('/static/charts/<filename>')
 def serve_chart(filename):
     return send_from_directory('static/charts',filename)
+
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# app.config["DOWNLOAD_FOLDER"] = os.path.join(BASE_DIR, "application", "User_downloads")
+
+@routes.route('/static/User_downloads/<filename>')
+def download_csv(filename):
+    return send_from_directory('static/User_downloads',filename, as_attachment=True)
+
+# @routes.route('/downloads/<filename>')
+# def download_file(filename):
+#     return send_from_directory(app.config["DOWNLOAD_FOLDER"], filename, as_attachment=True)
+
+# @routes.route('/downloads/<filename>')
+# def download_file(filename):
+#     return send_from_directory(os.path.join(BASE_DIR, "application", "jobs", "User_downloads"), filename)

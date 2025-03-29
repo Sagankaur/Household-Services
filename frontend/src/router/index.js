@@ -81,7 +81,20 @@ router.beforeEach((to, from, next) => {
   } else if (to.meta.requiresAuth && to.meta.role !== userRole) {
     next('/'); // Redirect to home or unauthorized page
   } else if (isAuth && ['/login', '/register', '/adminlogin'].includes(to.path)) {
-    next(`/home_${userRole.toLowerCase()}/${userId}`);
+      if (userRole && userId && !["undefined", "null", null].includes(userId)) {
+        next(`/home_${userRole.toLowerCase()}/${userId}`);
+      }
+      else {
+        console.warn("Invalid userId detected, removing from storage...");
+        store.dispatch("logout"); // Clear Vuex state
+        localStorage.removeItem("userId");
+        localStorage.removeItem("role");
+        localStorage.removeItem("authToken");
+        // userRole = null;
+        // userId = null;
+        next('/login');
+
+      }
   } else {
     next();
   }

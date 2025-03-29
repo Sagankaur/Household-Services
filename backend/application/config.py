@@ -55,3 +55,7 @@ class LocalDevelopmentConfig(Config):
     CACHE_REDIS_HOST="localhost"
     CACHE_REDIS_PORT=6379
     TIMEZONE="Asia/Kolkata"
+    
+    CELERY_BROKER_URL = "redis://localhost:6379/0"
+    CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+    

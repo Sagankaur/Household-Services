@@ -70,7 +70,7 @@ export default {
           throw new Error(data.error || "Login failed");
         }
   
-        if (response.ok) {
+        if (response.ok && data.token) {
           // Redirect based on role (case-insensitive check)
             this.$router.push(`/home_admin/${userId}`);
         } else {

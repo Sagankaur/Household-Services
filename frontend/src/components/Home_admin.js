@@ -10,12 +10,19 @@ export default {
             newService: { name: '', price: '', time_required: '', description: '' },
             editService: {},
             pendingProfessionals: [],
+            pendingCustomers: [],
             pendingRequests: [],
+            
             lowRatedProfessionals: [],
+            lowRatedCustomers : [],
+            
+            blockedProfessionals : [],
+            blockedCustomers : [],
 
             showModal: false,
             showEditModal: false,
             showProfessionalModal: false,
+            showCustomerModal: false,
             selectedProfessional: {},
             selectedRequest: {},
             showRequestModal: false,
@@ -52,10 +59,19 @@ export default {
                         'Authorization': `Bearer ${token}`
                     },
                 });
+                console.log("Fetch Admin Data",response.data);
                 this.adminData = response.data.admin;
-                this.pendingProfessionals = response.data.pending_professionals;
-                this.lowRatedProfessionals = response.data.low_rated_professionals;
+                
                 this.pendingRequests = response.data.pending_requests;
+                this.pendingCustomers = response.data.pending_customers;
+                this.pendingProfessionals = response.data.pending_professionals;
+                
+                this.lowRatedCustomers = response.data.low_rated_customers; 
+                this.lowRatedProfessionals = response.data.low_rated_professionals;
+                
+                this.blockedProfessionals = response.data.blocked_professional;
+                this.blockedCustomers = response.data.blocked_customer;
+
             } catch (error) {
                 console.error("Error fetching Admin data:", error);
             }
@@ -105,6 +121,21 @@ export default {
             }
         },
 
+        async deleteService(service_id) {
+            try {
+                const response = await axios.delete(`/delete_service/${service_id}`,{
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                if (response.status === 200) {
+                    alert('Service deleted successfully');
+                    await this.fetchServices();
+                }
+            } catch (error) {
+                console.error("Error deleting service:", error);
+            }
+        },
+
+
         async approveProfessional(id) {
             try {
                 const response = await axios.put(`/action_professional/${id}/approve`);
@@ -131,13 +162,48 @@ export default {
 
         async blockProfessional(id) {
             try {
-                const response = await axios.get(`/action_professional/${id}/block`);
+                const response = await axios.put(`/action_professional/${id}/block`);
                 if (response.status === 200) {
                     alert('Professional blocked');
                     await this.fetchAdminData();
                 }
             } catch (error) {
                 console.error("Error blocking professional:", error);
+            }
+        },
+        //ActionCust
+        async approveCustomer(id) {
+            try {
+                const response = await axios.put(`/action_customer/${id}/approve`);
+                if (response.status === 200) {
+                    alert('Customer approved');
+                    await this.fetchAdminData();
+                }
+            } catch (error) {
+                console.error("Error approving customer:", error);
+            }
+        },
+
+        async rejectCustomer(id) {
+            try {
+                const response = await axios.put(`/action_customer/${id}/reject`);
+                if (response.status === 200) {
+                    alert('Customer rejected');
+                    await this.fetchAdminData();
+                }
+            } catch (error) {
+                console.error("Error rejecting customer:", error);
+            }
+        },
+        async blockCustomer(id) {
+            try {
+                const response = await axios.put(`/action_customer/${id}/block`);
+                if (response.status === 200) {
+                    alert('Customer blocked');
+                    await this.fetchAdminData();
+                }
+            } catch (error) {
+                console.error("Error blocking customer:", error);
             }
         },
 
@@ -167,6 +233,10 @@ export default {
             this.selectedProfessional = professional;
             this.showProfessionalModal = true;
         },
+        viewCustomer(customer) {
+            this.selectedCustomer = customer;
+            this.showCustomerModal = true;
+        },
 
         closeRequestModal() {
             this.showRequestModal = false;
@@ -176,6 +246,9 @@ export default {
         },
         closeProfessionalModal() {
             this.showProfessionalModal = false;
+        },
+        closeCustomerModal() {
+            this.showCustomerModal = false;
         },
         toggleAddServiceForm() {
             this.showAddServiceForm = !this.showAddServiceForm;
@@ -214,14 +287,15 @@ export default {
         </form>
 
         <!-- Services List -->
-        <h3>All Services</h3>
+        <h3>----------All Services---------- </h3>
         <table class="table table-striped">
             <thead>
                 <tr>
                     <th>Name</th>
                     <th>Price</th>
                     <th>Time Required</th>
-                    <th>Actions</th>
+                    <th>Edit</th>
+                    <th>Delete</th>
                 </tr>
             </thead>
             <tbody>
@@ -231,6 +305,9 @@ export default {
                     <td>{{ service.time_required }} mins</td>
                     <td>
                         <button class="btn btn-info btn-sm" @click="openEditModal(service)">Edit</button>
+                    </td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" @click="deleteService(service.id)">Delete</button>
                     </td>
                 </tr>
             </tbody>
@@ -264,7 +341,8 @@ export default {
         </div>
 
         <!-- Professionals Pending Approval -->
-        <h3>Pending Professionals</h3>
+        <h3>---------Pending Users----------</h3>
+        <p> Professionals </p>
         <table class="table table-striped">
             <thead>
                 <tr>
@@ -286,6 +364,26 @@ export default {
             </tbody>
         </table>
 
+        <p> Customer </p>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="customer in pendingCustomers" :key="customer.id">
+                    <td>{{ customer.username }}</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" @click="viewCustomer(customer)">View</button>
+                        <button class="btn btn-success btn-sm" @click="approveCustomer(customer.id)">Approve</button>
+                        <button class="btn btn-danger btn-sm" @click="rejectCustomer(customer.id)">Reject</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
         <!-- Modal for Viewing Professional Details -->
         <div v-if="showProfessionalModal" class="modal">
             <div class="modal-content">
@@ -300,8 +398,20 @@ export default {
             </div>
         </div>
 
+        <!-- Modal for Viewing Customer Details -->
+        <div v-if="showCustomerModal" class="modal">
+            <div class="modal-content">
+                <span class="close" @click="closeCustomerModal">&times;</span>
+                <h4>Customer Details</h4>
+                <p><strong>Name:</strong> {{ selectedCustomer.name }}</p>
+                <p><strong>Username:</strong> {{ selectedCustomer.username }}</p>
+                <p><strong>Email:</strong> {{ selectedCustomer.email }}</p>
+                <p><strong>Phone:</strong> {{ selectedCustomer.phone_number }}</p>
+            </div>
+        </div>
+
         <!-- Service Requests -->
-        <h3>Pending Service Requests</h3>
+        <h3>----------Pending Service Requests----------</h3>
         <table class="table table-striped">
             <thead>
                 <tr>
@@ -335,8 +445,9 @@ export default {
             </div>
         </div>
 
-        <!-- Low Rated Professionals -->
-        <h3>Low-Rated Professionals</h3>
+        <!-- Low Rated users -->
+        <h3>----------Low-Rated Users----------</h3>
+        <p>Professionals</p>
         <table class="table table-striped">
             <thead>
                 <tr>
@@ -356,6 +467,70 @@ export default {
                 </tr>
             </tbody>
         </table>
+        <p>Customer</p>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="customer in lowRatedCustomers" :key="customer.id">
+                    <td>{{ customer.username }}</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" @click="viewCustomer(customer)">View</button>
+                        <button class="btn btn-warning btn-sm" @click="blockCustomer(customer.id)">Block</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Blocked users -->
+        <h3>----------Blocked Users----------</h3>
+
+        <p> Professionals </p>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Service</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="professional in blockedProfessionals" :key="professional.id">
+                    <td>{{ professional.username }}</td>
+                    <td>{{ professional.service_name }}</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" @click="viewProfessional(professional)">View</button>
+                        <button class="btn btn-success btn-sm" @click="approveProfessional(professional.id)">Approve</button>
+                        <button class="btn btn-danger btn-sm" @click="rejectProfessional(professional.id)">Delete</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p> Customer </p>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr v-for="customer in blockedCustomers" :key="customer.id">
+                    <td>{{ customer.username }}</td>
+                    <td>
+                        <button class="btn btn-info btn-sm" @click="viewCustomer(customer)">View</button>
+                        <button class="btn btn-success btn-sm" @click="approveCustomer(customer.id)">Approve</button>
+                        <button class="btn btn-danger btn-sm" @click="rejectCustomer(customer.id)">Delete</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+
     </div>
     `
 };

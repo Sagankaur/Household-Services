@@ -60,7 +60,7 @@ export default {
                 const data = response.data;
                 this.PendingRequests = data.pending_requests;
                 this.AcceptedRequests = data.accepted_requests;
-                this.CompletedRequests = data.completed_requests;
+                this.CompletedRequests = data.closed_requests;
                 this.user = data.user;
                 this.professional = data.professional; 
                 console.log(response.data)
@@ -132,7 +132,7 @@ export default {
                 alert('Failed to approve request.');
             }
         },
-        async rejectRequest(id) {
+        async rejectRequest(id) { 
             try {
                 await axios.post(`http://localhost:5000/service_request_action/${this.userId}/${id}/reject`, {}, {
                     headers: {
@@ -144,6 +144,20 @@ export default {
             } catch (error) {
                 console.error('Error rejecting request:', error);
                 alert('Failed to reject request.');
+            }
+        },
+        async closeRequest(id) { 
+            try {
+                await axios.post(`http://localhost:5000/service_request_action/${this.userId}/${id}/close`, {}, {
+                    headers: {
+                        Authorization: `Bearer ${this.$store.getters.authToken}`
+                    }
+                });
+                alert('Request sent');
+                this.fetchData();
+            } catch (error) {
+                console.error('Error approving request:', error);
+                alert('Failed to approve request.');
             }
         },
         closeModal() {
@@ -233,9 +247,9 @@ export default {
                             v-model="professional.experience"
                         />
                     </div>
-                    <button type="submit" class="btn btn-outline-primary">Save Changes</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
                 </form>
-                <button @click="cancelEdit" class="btn btn-outline-secondary">Cancel</button>
+                <button @click="cancelEdit" class="btn btn-secondary">Cancel</button>
             </div>
         </div>
 
@@ -248,7 +262,7 @@ export default {
                 <li><strong>Pincode:</strong> {{ user.pincode }}</li>
                 <li><strong>Experience:</strong> {{ professional.experience }}</li>
             </ul>
-            <button btn btn-outline-primary @click="editProfile">Edit Profile</button>
+            <button btn btn-primary @click="editProfile">Edit Profile</button>
         </div>
 
         <!-- Modal for Viewing Service Request Details -->
@@ -280,6 +294,7 @@ export default {
                             <th>Date of Request</th>
                             <th>Phone</th>
                             <th>View</th>
+                            <th>Close</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -289,7 +304,10 @@ export default {
                             <td>{{ request.date_of_request }}</td>
                             <td>{{ request.c_phone }}</td>
                             <td>
-                                <button class="btn btn-outline-primary" @click="viewRequest(request.id)">View</button>
+                                <button class="btn btn-primary" @click="viewRequest(request.id)">View</button>
+                            </td>
+                            <td>
+                                <button class="btn btn-warning" @click="closeRequest(request.id)">Close</button>
                             </td>
                         </tr>
                     </tbody>
@@ -309,8 +327,8 @@ export default {
                             <th>Customer Name</th>
                             <th>Date of Request</th>
                             <th>Phone</th>
-                            <th>Actions</th>
                             <th>View</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -320,13 +338,13 @@ export default {
                             <td>{{ request.date_of_request }}</td>
                             <td>{{ request.c_phone }}</td>
                             <td>
-                                <button class="btn btn-outline-success" @click="approveRequest(request.id)">Approve</button>
-                                <button class="btn btn-outline-danger" @click="rejectRequest(request.id)">Reject</button>
+                                <button class="btn btn-primary" @click="viewRequest(request.id)">View</button>
                             </td>
                             <td>
-                                <button class="btn btn-outline-primary" @click="viewRequest(request.id)">View</button>
+                                <button class="btn btn-success" @click="approveRequest(request.id)">Approve</button>
+                                <button class="btn btn-danger" @click="rejectRequest(request.id)">Reject</button>
                             </td>
-
+                            
                         </tr>
 
                     </tbody>
@@ -357,7 +375,7 @@ export default {
                             <td>{{ request.date_of_request }}</td>
                             <td>{{ request.c_phone }}</td>
                             <td>
-                                <button class="btn btn-outline-primary" @click="viewRequest(request.id)">View</button>
+                                <button class="btn btn-primary" @click="viewRequest(request.id)">View</button>
                             </td>
                         </tr>
                     </tbody>

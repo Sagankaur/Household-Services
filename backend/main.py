@@ -5,6 +5,10 @@ from flask_security import Security, SQLAlchemySessionUserDatastore
 
 from flask_jwt_extended import JWTManager
 from werkzeug.security import generate_password_hash
+
+# import yaml
+# from flasgger import Swagger
+
 from flask_caching import Cache
 from flask_cors import CORS
 
@@ -37,19 +41,23 @@ def create_app():
     db.init_app(app)
     cache.init_app(app)
 
+    # with open("openapi.yaml", "r") as file:
+    #     openapi_spec = yaml.safe_load(file)
+    # Swagger(app, template=swagger_template)
+
     app.app_context().push()
     celery=workers.celery
-    # celery.conf.update(
-    #     broker_url = app.config["CELERY_BROKER_URL"],
-    #     result_backend = app.config["CELERY_RESULT_BACKEND"],
-    #     timezone="Asia/Kolkata",
-    #     broker_connection_retry_on_startup=True
-    # )
+    celery.conf.update(
+        broker_url = app.config["CELERY_BROKER_URL"],
+        result_backend = app.config["CELERY_RESULT_BACKEND"],
+        timezone="Asia/Kolkata",
+        broker_connection_retry_on_startup=True
+    )
 
     celery.Task =workers.ContextTask
     app.app_context().push()
     celery.conf.update(
-        broker_url = app.config["CELERY_BROKER_URL"],
+        broker_url = app.config["CELERY_BROKER_URL"], # OR from_object(LocalDevelopmentConfig)
         result_backend = app.config["CELERY_RESULT_BACKEND"],
         timezone="Asia/Kolkata",
         broker_connection_retry_on_startup=True
@@ -64,7 +72,10 @@ def create_app():
         api.add_resource(AdminServiceUpdate, '/update_service/<int:service_id>')
         # api.add_resource(AdminServiceGet, '/get_services')
         api.add_resource(ActionProf, '/action_professional/<int:id>/<action>')
+        api.add_resource(ActionCust, '/action_customer/<int:id>/<action>') #more
+
         api.add_resource(AdminRequestDelete, '/delete_request/<int:request_id>')
+        api.add_resource(AdminServiceDelete, '/delete_service/<int:service_id>') #more
         
         # api.add_resource(AdminViewService, '/view_service/<int:id>')
         api.add_resource(AdminSummary, '/summary_admin/<int:user_id>')
@@ -73,7 +84,7 @@ def create_app():
         api.add_resource(AdminSearch, '/search_admin/<int:user_id>')
         api.add_resource(AdminViewProfessional, '/view_professional/<int:id>')
         api.add_resource(AdminViewCustomer, '/view_customer/<int:id>')
-        api.add_resource(RequestView, '/view_request/<int:id>') #home_prof,home_cust
+        api.add_resource(RequestView, '/view_request/<int:id>',methods=["GET", "PUT"]) #home_prof,home_cust more put
 
         api.add_resource(ProfessionalHome, "/home_professional/<int:user_id>",methods=["GET", "PUT"])
         # api.add_resource(ProfessionalProfile, "/edit_profile_prof")
@@ -114,3 +125,11 @@ if __name__ == "__main__":
     # print(check_password_hash(user.password, "pass"))  # Should be True if correct
 
     app.run(debug=True)
+
+# 1. Python3 app.py 
+# 2. npm run serve
+# sudo systemctl stop redis
+# 4. redis-server 
+# 5. celery -A application.jobs.workers worker --loglevel=info
+# 6.celery -A application.jobs.workers beat --loglevel=info
+# 7. mailhog      http://localhost:8025/

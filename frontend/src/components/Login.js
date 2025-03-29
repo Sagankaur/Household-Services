@@ -48,6 +48,19 @@ export default {
         });
     
         const data = await response.json(); //'token': token, 'userId': user.id, 'role': role
+        console.log(data);
+        if (!response.ok) {
+          throw new Error(data.error || "Login failed");
+        }
+        if (data.error) {
+          throw new Error(data.error || "Login failed from backend");
+        }
+        
+        if (!data.userId || !data.role || !data.token) {
+          throw new Error("Invalid response from server: Missing userId, role, or token");
+        }
+
+        
         console.log('Full response data:', data);
         const { userId, role, token } = data;
         this.$store.dispatch('login', { userId, role, authToken: token }) 
@@ -55,8 +68,10 @@ export default {
         if (!response.ok) {
           throw new Error(data.error || "Login failed");
         }
+      
+
     
-        if (response.ok) {
+        if (data.token && userId && role && typeof userId === "number") {
           // Redirect based on role (case-insensitive check)
           console.log('Id:', userId);
           if (role.toLowerCase() === "professional") {
@@ -65,7 +80,7 @@ export default {
             this.$router.push(`/home_customer/${userId}`);
           }
         } else {
-          this.errorMessage = 'Login failed: No token received';
+          this.errorMessage = "No token";
         }
       } catch (error) {
         console.error("Login error:", error);

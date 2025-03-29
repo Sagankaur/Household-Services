@@ -1,0 +1,1184 @@
+openapi: "3.0.0"
+info:
+  title: "Household Services API"
+  description: "API for managing household services"
+  contact:
+    email: 23f2003511@ds.study.iitm.ac.in
+  version: "1.0.0"
+
+servers:
+  - url: "http://localhost:5000"
+    description: "Local development server"
+
+paths:
+   /login:
+    get:
+      summary: Login API (GET)
+      description: Returns an instruction message for login API.
+      responses:
+        400:
+          description: GET method not allowed for login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "This is a login API. Please send a POST request with JSON data."
+
+    post:
+      summary: User Login
+      description: Authenticates a user and returns a JWT token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "user123"
+                password:
+                  type: string
+                  example: "password123"
+      responses:
+        200:
+          description: Login successful.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  userId:
+                    type: integer
+                    example: 1
+                  role:
+                    type: string
+                    example: "Customer"
+        400:
+          description: Missing or invalid request data.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Missing username or password"
+        401:
+          description: Invalid credentials.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid credentials"
+        403:
+          description: Access denied for certain roles or blocked users.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Access Denied. Admins cannot log in here."
+        500:
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "An unexpected error occurred"
+  /register:
+    post:
+      summary: User registration
+      tags:
+        - Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                username:
+                  type: string
+                password:
+                  type: string
+                email:
+                  type: string
+                phone_number:
+                  type: string
+                address:
+                  type: string
+                pincode:
+                  type: string
+                role:
+                  type: string
+      responses:
+        '201':
+          description: Registration successful.
+        '400':
+          description: Username already exists.
+        '405':
+          description: Invalid request method.
+
+  /adminlogin:
+    post:
+      summary: Admin login
+      tags:
+        - Authorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Successful admin login.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  userId:
+                    type: integer
+                  role:
+                    type: string
+        '400':
+          description: Bad request (missing or invalid data).
+        '401':
+          description: Invalid credentials.
+        '403':
+          description: Access denied for non-admin users.
+        '404':
+          description: User not found.
+        '500':
+          description: Internal server error.
+
+  /get_services:
+    get:
+      summary: Get all available services.
+      tags:
+        - Others
+      responses:
+        '200':
+          description: List of services.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                    name:
+                      type: string
+                    description:
+                      type: string
+
+  /logout:
+    get:
+      summary: Logout a user and clear session data.
+      tags:
+        - Authorization
+      responses:
+        '302':
+          description: Redirect to login page.
+
+  /static/charts/{filename}:
+    get:
+      summary: Serve chart files from static directory.
+      tags:
+        - Others
+      parameters:
+        - in: path
+          name: filename
+          required: true
+          schema:
+            type: string
+            description: Name of the chart file to be served.
+      responses:
+        '200':
+          description: Chart file served successfully.
+          content:
+            image/*:
+
+  /downloads/{filename}:
+    get:
+      summary: Download files from the user downloads directory.
+      tags:
+        - Others
+      parameters:
+        - in: path
+          name: filename
+          required: true
+          schema:
+            type: string
+            description: Name of the file to be downloaded.
+      responses:
+        '200':
+          description: File downloaded successfully.
+
+
+  /home_customer/{user_id}:
+    get:
+      summary: Fetch customer details and service history
+      tags:
+        - Customer
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Customer details and service history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer_user:
+                    type: object
+                  service_history:
+                    type: array
+        '404':
+          description: User not found
+    put:
+      summary: Update customer profile details
+      tags:
+        - Customer
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                phone_number:
+                  type: string
+                username:
+                  type: string
+                pincode:
+                  type: string
+                address:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated successfully
+        '400':
+          description: Email already in use
+
+  /search_customer/{user_id}:
+    post:
+      summary: Search for services
+      tags:
+        - Customer
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                service_name:
+                  type: string
+                pincode:
+                  type: string
+                rating:
+                  type: number
+                address:
+                  type: string
+      responses:
+        '200':
+          description: List of professionals matching the search criteria
+        '400':
+          description: Empty request body or invalid search parameters
+
+  /summary_customer/{user_id}:
+    get:
+      summary: Get customer summary
+      tags:
+        - Customer
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Customer summary data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bar_graph_path:
+                    type: string
+
+  /book_service/{user_id}/{service_id}:
+    post:
+      summary: Book a service
+      tags:
+        - Customer
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: service_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                professional_id:
+                  type: integer
+                remarks:
+                  type: string
+      responses:
+        '201':
+          description: Service successfully booked
+        '400':
+          description: Pending request already exists
+        '500':
+          description: Error occurred while booking the service
+
+  /close_request/{user_id}/{request_id}:
+    put:
+      summary: Close a service request
+      tags:
+        - Customer
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: request_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating:
+                  type: number
+                review:
+                  type: string
+      responses:
+        '200':
+          description: Service request closed and review submitted successfully
+        '400':
+          description: Invalid rating value or missing required fields
+
+
+  /home_professional/{user_id}:
+    get:
+      summary: Fetch professional dashboard data
+      tags:
+        - Professional
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Professional dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    type: object
+                  professional:
+                    type: object
+                  pending_requests:
+                    type: array
+                    items:
+                      type: object
+                  accepted_requests:
+                    type: array
+                    items:
+                      type: object
+                  completed_requests:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: User not found
+    put:
+      summary: Update professional profile
+      tags:
+        - Professional
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                name:
+                  type: string
+                email:
+                  type: string
+                phone_number:
+                  type: string
+                address:
+                  type: string
+                pincode:
+                  type: string
+                experience:
+                  type: integer
+      responses:
+        '200':
+          description: Profile updated successfully
+        '404':
+          description: User not found
+
+  /service_request_action/{user_id}/{request_id}/{action}:
+    post:
+      summary: Perform an action on a service request
+      description: Allows professionals to accept, reject, or close service requests.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the professional performing the action.
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the service request.
+        - name: action
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [accept, reject, close]
+          description: Action to be performed (`accept`, `reject`, or `close`).
+      responses:
+        '200':
+          description: Service request action completed successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Request accepted successfully"
+        '400':
+          description: Invalid action or request state issue.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Invalid action"
+        '403':
+          description: Unauthorized action (not a professional).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Access denied. Professionals only."
+        '404':
+          description: Service request or user not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Service request not found"
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Internal server error"
+
+  /search_professional/{user_id}:
+    get:
+      summary: Search for service requests
+      tags:
+        - Professional
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: search_type
+          required: true
+          schema:
+            type: string
+            enum: [date, address, pincode]
+        - in: query
+          name: value
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  requests:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          description: Invalid search parameters
+
+  /summary_professional/{user_id}:
+    get:
+      summary: Get professional summary
+      tags:
+        - Professional
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Professional summary data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pie_chart_prof:
+                    type: string
+                  bar_chart_prof:
+                    type: string
+                  average_rating:
+                    type: number
+        '404':
+          description: Professional not found
+  
+  
+  /home_admin/{user_id}:
+    get:
+      summary: Admin dashboard
+      tags:
+        - Admin
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Admin dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  services:
+                    type: array
+                    items:
+                      type: object
+                  pending_professionals:
+                    type: array
+                    items:
+                      type: object
+                  pending_customers:
+                    type: array
+                    items:
+                      type: object
+                  low_rated_professionals:
+                    type: array
+                    items:
+                      type: object
+                  low_rated_customers:
+                    type: array
+                    items:
+                      type: object
+                  blocked_professionals:
+                    type: array
+                    items:
+                      type: object
+                  blocked_customers:
+                    type: array
+                    items:
+                      type: object
+                  pending_requests:
+                    type: array
+                    items:
+                      type: object
+                  admin:
+                    type: object
+        '403':
+          description: Access denied
+
+  /add_service:
+    post:
+      summary: Add a new service
+      tags:
+        - Admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                price:
+                  type: number
+                time_required:
+                  type: integer
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Service added successfully
+        '400':
+          description: Invalid request
+
+  /update_service/{service_id}:
+    put:
+      summary: Update service details
+      tags:
+        - Admin
+      parameters:
+        - in: path
+          name: service_id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                price:
+                  type: number
+                time_required:
+                  type: integer
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Service updated successfully
+        '404':
+          description: Service not found
+
+  /action_professional/{id}/{action}:
+    put:
+      summary: Approve/reject professionals
+      tags:
+        - Admin
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: action
+          required: true
+          schema:
+            type: string
+            enum: [approve, reject, block]
+      responses:
+        '200':
+          description: Action performed successfully
+        '400':
+          description: Invalid action
+        '404':
+          description: Professional not found
+
+  /action_customer/{id}/{action}:
+      put:
+        summary: Approve/reject professionals
+        tags:
+          - Admin
+        parameters:
+          - in: path
+            name: id
+            required: true
+            schema:
+              type: integer
+          - in: path
+            name: action
+            required: true
+            schema:
+              type: string
+              enum: [approve, reject, block]
+        responses:
+          '200':
+            description: Action performed successfully
+          '400':
+            description: Invalid action
+          '404':
+            description: Customer not found
+
+  /delete_request/{request_id}:
+    delete:
+      summary: Delete a service request
+      tags:
+        - Admin
+      parameters:
+        - in: path
+          name: request_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Service request deleted successfully
+        '404':
+          description: Service request not found
+
+    /delete_service/{service_id}:
+    delete:
+      summary: Delete a service
+      description: Deletes a service and reassigns professionals to "Test Service" if available.
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the service to delete.
+      responses:
+        200:
+          description: Service deleted successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Service deleted successfully"
+        400:
+          description: "Test Service not found, cannot reassign professionals."
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: '"Test Service" not found, cannot reassign professionals'
+        404:
+          description: Service request not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Service request not found"
+
+  /summary_admin/{user_id}:
+    get:
+      summary: Get admin summary
+      tags:
+        - Admin
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Admin summary data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bar_graph_path_admin:
+                    type: string
+                  pie_chart_path_admin:
+                    type: string
+        '403':
+          description: Access denied
+
+  /export_csv/{professional_id}:
+    get:
+      summary: Export professional data to CSV
+      tags:
+        - Admin
+      parameters:
+        - in: path
+          name: professional_id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: CSV export job started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  task_id:
+                    type: string
+        '500':
+          description: Error in starting export job
+
+  /search_admin/{user_id}:
+    get:
+      summary: Search for users or services
+      tags:
+        - Admin
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: integer
+        - in: query
+          name: search_type
+          required: true
+          schema:
+            type: string
+            enum: [Professional, Customer, Service, Service Request]
+        - in: query
+          name: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '403':
+          description: Access denied
+
+  /view_professional/{id}:
+    get:
+      summary: View professional details
+      tags:
+        - Admin
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Professional details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  professional:
+                    type: object
+                  service_requests:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Professional not found
+
+  /view_customer/{id}:
+    get:
+      summary: View customer details
+      tags:
+        - Admin
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Customer details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  customer:
+                    type: object
+                  service_requests:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Customer not found
+
+  /view_request/{id}:
+    get:
+      summary: Get service request details
+      description: Fetches details of a specific service request by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the service request.
+      responses:
+        '200':
+          description: Service request details retrieved successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                example:
+                  id: 2
+                  customer_username: "cust"
+                  customer_name: "cust1"
+                  c_address: "123 Cust Street"
+                  c_pincode: "122222"
+                  c_phone: "5666690"
+                  professional_username: "prof"
+                  professional_name: "prof"
+                  p_phone: "0123456789"
+                  service: "Test Service"
+                  date_of_request: "2025-03-04"
+                  remarks: null
+                  service_status: "accepted"
+                  date_of_completion: "2025-03-06"
+                  review: "Great service!"
+                  rating: 4.5
+        '404':
+          description: Service request not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Service request not found"
+                    
+    put:
+      summary: Update service request details
+      description: Updates specific fields of a service request.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID of the service request to update.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                c_address:
+                  type: string
+                  example: "123 Cust new"
+                c_pincode:
+                  type: string
+                  example: "122222"
+                c_phone:
+                  type: string
+                  example: "5666690"
+                date_of_request:
+                  type: string
+                  format: date
+                  example: "2025-03-27"
+                review:
+                  type: string
+                  example: "Great service!"
+                rating:
+                  type: number
+                  format: float
+                  example: 4.5
+                remarks:
+                  type: string
+                  example: "Completed successfully"
+      responses:
+        '200':
+          description: Service request updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Service request updated successfully"
+                  request:
+                    type: object
+                    example:
+                      id: 2
+                      customer_username: "cust"
+                      customer_name: "cust1"
+                      c_address: "123 Cust new"
+                      c_pincode: "122222"
+                      c_phone: "5666690"
+                      professional_username: "prof"
+                      professional_name: "prof"
+                      p_phone: "0123456789"
+                      service: "Test Service"
+                      date_of_request: "2025-03-27"
+                      remarks: "Completed successfully"
+                      service_status: "accepted"
+                      date_of_completion: "2025-03-06"
+                      review: "Great service!"
+                      rating: 4.5
+        '400':
+          description: Invalid request body or empty request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Empty request body"
+        '403':
+          description: Update not allowed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Cannot update service request"
+                  error:
+                    type: string
+                    example: "Not allowed"
+        '404':
+          description: Service request not found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Service request not found"
+        '500':
+          description: Failed to update request due to a server error.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Failed to update request"
+                  error:
+                    type: string
+                    example: "Database error or unexpected issue"
+
+securitySchemes:
+  BearerAuth:
+    type: http
+    scheme: bearer
+    bearerFormat: JWT

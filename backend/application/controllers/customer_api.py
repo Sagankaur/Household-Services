@@ -159,6 +159,7 @@ class ServiceClosure(Resource):
         data = request.json
         rating = data.get('rating')
         review = data.get('review')
+
         try:
             rating = float(data.get('rating')) 
         except (ValueError, TypeError):
@@ -178,10 +179,10 @@ class ServiceClosure(Resource):
         if professional:
             total_reviews = professional.total_reviews + 1
             current_rating = professional.ratings or 0  # Handle None case
-            professional.ratings = ((current_rating * professional.total_reviews) + rating) / total_reviews
+            professional.ratings = ((current_rating * total_reviews) + current_rating) / total_reviews
             professional.total_reviews = total_reviews
+            professional.update_ratings_and_reviews()
             db.session.commit()
-
         return jsonify({"message": "Service request closed and review submitted successfully."})
 
 class CustomerSummary(Resource):

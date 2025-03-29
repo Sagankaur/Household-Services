@@ -11,7 +11,8 @@ export default {
         professionalId: null,
         message: '',
         userId: null,
-        showFullDetails: false
+        showFullDetails: false,
+        exporting: {}
       }
     },
     created() {
@@ -94,9 +95,13 @@ export default {
             }
         },
         async exportCSV(id) {
+            this.exporting[id] = true;  
             try {
-                const response = await axios.get(`/export_csv/${id}`);
-                if (response.data.success) {
+                const response = await axios.get(`/export_csv/${id}`); //async or axios? as it calls redis function 
+                console.log(response)
+                console.log(response.data)
+                // {message: 'CSV export job started', task_id: 'a1bd6a04-2242-4713-975e-1795bf20622f'}
+                if (response.data.task_id) {
                     this.message = 'CSV export initiated. Check your email shortly.';
                 } else {
                     this.message = 'CSV export failed.';
@@ -104,6 +109,9 @@ export default {
             } catch (error) {
                 console.error('Error exporting CSV:', error);
                 this.message = 'Error exporting CSV. Please try again later.';
+            }
+            finally {
+                this.exporting[id] = false;  
             }
         },
         toggleFullDetails() {
@@ -125,6 +133,7 @@ export default {
             <table v-if="searchType === 'Professional'" class="table">
                 <thead>
                     <tr>
+                        <th>ID</th>
                         <th>Username</th>
                         <th>Ratings</th>
                         <th>Status</th>
@@ -133,13 +142,20 @@ export default {
                 </thead>
                 <tbody>
                     <tr v-for="prof in searchResults" :key="prof.id">
+                        <td>{{ prof.id }}</td>
                         <td>{{ prof.username }}</td>
                         <td>{{ prof.ratings }}</td>
                         <td>{{ prof.status }}</td>
                         <td>
                             <button class="btn btn-info btn-sm" @click="viewProfessional(prof.id)">View</button>
                             <button class="btn btn-warning btn-sm" @click="blockProfessional(prof.id)">Block</button>
-                            <button @click="exportCSV(prof.id)" class="btn btn-primary">Export CSV</button>
+                            <button 
+                                @click="exportCSV(prof.id)" 
+                                :disabled="exporting[prof.id]" 
+                                class="btn btn-primary btn-sm">
+                                {{ exporting[prof.id] ? 'Exporting...' : 'Export' }}
+
+                            </button>
                         </td>
                     </tr>
                 </tbody>

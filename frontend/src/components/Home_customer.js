@@ -6,6 +6,7 @@ export default {
     return {
       userId: null,
       isEditing: false,
+      isEditingServiceReq :false,
       customer: {
         id: null,
         customer: {},
@@ -102,8 +103,9 @@ export default {
         console.log("View Reques data", this.customer)
         this.customer.selectedRequest = response.data;
         this.customer.showRequestModal = true;
-        console.log("showRequestModal set to:", this.customer.showRequestModal); // Debug
-        console.log("selectedRequest:", this.customer.selectedRequest); // Debug
+        // console.log("showRequestModal set to:", this.customer.showRequestModal); // Debug
+        console.log("selectedRequest:", this.customer.selectedRequest); 
+        // {c_address: '123 Cust new, USA', c_phone: '5666699', c_pincode: '122200', customer_name: 'cust1', customer_username: 'cust'}
       } catch (error) {
         console.error("Error fetching request details:", error);
       }
@@ -164,6 +166,38 @@ export default {
         alert("Please provide a rating and feedback.");
       }
     },
+    async editRequest(requestId) {
+      try {
+          const updatedData = {
+              c_address: this.customer.selectedRequest?.c_address,
+              c_pincode: this.customer.selectedRequest?.c_pincode,
+              c_phone: this.customer.selectedRequest?.c_phone,
+              date_of_request: this.customer.selectedRequest?.date_of_request,
+              review: this.customer.selectedRequest?.review,
+              rating: this.customer.selectedRequest?.rating,
+              remarks: this.customer.selectedRequest?.remarks
+          };
+  
+          const response = await axios.put(
+              `http://localhost:5000/view_request/${requestId}`,
+              updatedData,  // Pass data to update
+              {
+                  headers: {
+                      Authorization: `Bearer ${this.$store.getters.authToken}`,
+                      "Content-Type": "application/json",
+                  },
+              }
+          );
+  
+          this.customer.selectedRequest = response.data.request;
+          alert("Service request updated successfully!");
+          this.isEditingServiceReq = false;
+      } catch (error) {
+          console.error("Error updating request:", error);
+          alert("Failed to update request. Please try again.");
+    
+      }
+    },  
     closeRequestModal() {
       this.customer.showRequestModal = false;
       this.customer.selectedRequest = {};
@@ -224,31 +258,64 @@ export default {
       </ul>
       <button @click="editProfile" class="btn btn-primary">Edit Profile</button>
     </div>
-
     <!-- Service Request Modal -->
     <div v-if="customer.showRequestModal" class="modal">
       <div class="modal-content">
         <span class="close" @click="closeRequestModal">&times;</span>
         <h4>Service Request Details</h4>
-        <p>
-          <strong>Professional Username:</strong>
-          {{ customer.selectedRequest?.professional_username || "N/A" }}
-        </p>
-        <p>
-          <strong>Professional Name:</strong>
-          {{ customer.selectedRequest?.professional_name || "N/A" }}
-        </p>
-        <p><strong>Address:</strong> {{ customer.selectedRequest?.address || "N/A" }}</p>
-        <p><strong>Pincode:</strong> {{ customer.selectedRequest?.pincode || "N/A" }}</p>
+        <p><strong>Professional Username:</strong> {{ customer.selectedRequest?.professional_username || "N/A" }}</p>
+        <p><strong>Professional Name:</strong> {{ customer.selectedRequest?.professional_name || "N/A" }}</p>
+        <p><strong>Address:</strong> {{ customer.selectedRequest?.c_address || "N/A" }}</p>
+        <p><strong>Pincode:</strong> {{ customer.selectedRequest?.c_pincode || "N/A" }}</p>
         <p><strong>Phone:</strong> {{ customer.selectedRequest?.p_phone || "N/A" }}</p>
         <p><strong>Service:</strong> {{ customer.selectedRequest?.service || "N/A" }}</p>
-        <p>
-          <strong>Date of Request:</strong>
-          {{ customer.selectedRequest?.date_of_request || "N/A" }}
-        </p>
+        <p><strong>Date of Request:</strong> {{ customer.selectedRequest?.date_of_request || "N/A" }}</p>
         <p><strong>Review:</strong> {{ customer.selectedRequest?.review || "N/A" }}</p>
+
+        <!-- Edit Button for Pending Requests -->
+        <button class="btn btn-primary btn-sm" @click="isEditingServiceReq = true" >
+          Edit Your Details
+        </button>
+
+        <!-- Toggle Edit Mode -->
+        <div v-if="isEditingServiceReq">
+          <div v-if="customer.selectedRequest?.service_status === 'closed'">
+            <label><strong>Review:</strong></label>
+            <input v-model="customer.selectedRequest.review" type="text" />
+
+            <label><strong>Rating:</strong></label>
+            <input v-model="customer.selectedRequest.rating" type="number" min="1" max="5" />
+          </div>
+
+          <div v-else>
+            <label><strong>Address:</strong></label>
+            <input v-model="customer.selectedRequest.c_address" type="text" />
+
+            <label><strong>Pincode:</strong></label>
+            <input v-model="customer.selectedRequest.c_pincode" type="text" />
+
+            <label><strong>Phone:</strong></label>
+            <input v-model="customer.selectedRequest.c_phone" type="text" />
+
+            <label><strong>Date of Request:</strong></label>
+            <input v-model="customer.selectedRequest.date_of_request" type="date" />
+
+            <label><strong>Remarks:</strong></label>
+            <input v-model="customer.selectedRequest.remarks" type="text" />
+          </div>
+
+          <!-- Save and Cancel Buttons -->
+          <button class="btn btn-success btn-sm" @click="editRequest(customer.selectedRequest?.id)">
+            Save Changes
+          </button>
+          <button class="btn btn-secondary btn-sm" @click="isEditingServiceReq = false">
+            Cancel
+          </button>
+        </div>
       </div>
-    </div>... <!-- Review Modal -->
+    </div>
+
+    <!-- Review Modal -->
     <div v-if="customer.showReviewModal" class="modal">
       <div class="modal-content">
         <span class="close" @click="closeReviewModal">&times;</span>
@@ -286,6 +353,7 @@ export default {
         <table v-if="customer.serviceHistory.length > 0" class="table">
           <thead>
             <tr>
+              <th>ID</th>
               <th>Service</th>
               <th>Status</th>
               <th>Request Date</th>
@@ -295,22 +363,24 @@ export default {
           </thead>
           <tbody>
             <tr v-for="request in customer.serviceHistory" :key="request.id">
+              <td>{{ request.id }}</td>
               <td>{{ request.service }}</td>
               <td>{{ request.service_status }}</td>
               <td>{{ request.date_of_request }}</td>
-              <td>{{ request.ratings || "N/A" }}</td>
+              <td>{{ request.rating || "N/A" }}</td>
               <td>
                 <button class="btn btn-info btn-sm" @click="viewRequest(request.id)">
                   View
                 </button>
+
                 <button
                   class="btn btn-success btn-sm"
                   @click="completeRequest(request.id)"
-                  v-if="request.service_status === 'pending'"
-                >
+                  v-if="request.service_status === 'pending'">
                   Rate and Close
                 </button>
                 <span v-else>Closed</span>
+                
               </td>
             </tr>
           </tbody>
